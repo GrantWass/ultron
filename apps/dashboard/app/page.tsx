@@ -62,9 +62,9 @@ export default async function RootPage() {
             <span className="text-primary">Know how to fix it.</span>
           </h1>
           <p className="text-lg text-muted-foreground text-center max-w-2xl mx-auto mb-10 leading-relaxed">
-            Lightweight error monitoring for indie devs and small teams. Catch JS errors,
-            slow network requests, and web vitals — then let AI tell you exactly how to fix them.
-            Paste 3 lines and you're live.
+            Lightweight error monitoring for single devs and small teams. Catch JS errors,
+            slow network requests, and web vitals across all of your projects — then let AI tell you exactly how to fix them.
+            Paste 5 lines and you're live.
           </p>
 
           {/* CTAs */}
