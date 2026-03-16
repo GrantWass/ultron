@@ -1,0 +1,15 @@
+{
+  "name": "ultron",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter dashboard dev",
+    "build": "pnpm --filter @ultron/types build && pnpm --filter dashboard build",
+    "build:sdk": "pnpm --filter @ultron/tracker build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  }
+}
