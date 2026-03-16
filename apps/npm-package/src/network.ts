@@ -68,6 +68,10 @@ function getTimingBreakdown(reqUrl: string): Record<string, number> | null {
     // Match the most recent entry for this URL
     const entry = entries.filter((e) => e.name === reqUrl).pop()
     if (!entry || !entry.responseEnd) return null
+    // Cross-origin servers without Timing-Allow-Origin cause responseStart to be 0,
+    // making transfer = responseEnd (inflated) while total remains correct.
+    // Return null so we don't display misleading values.
+    if (entry.responseStart === 0) return null
     return {
       dns: Math.round(entry.domainLookupEnd - entry.domainLookupStart),
       tcp: Math.round(entry.connectEnd - entry.connectStart),
