@@ -7,6 +7,17 @@ import type { IngestPayload } from '@ultron/types'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, x-api-key',
+}
+
+// Handle preflight requests
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: CORS_HEADERS })
+}
+
 const EventTypeSchema = z.enum(['error', 'network', 'vital', 'resource_error']).default('error')
 
 const ErrorPayloadSchema = z.object({
@@ -100,8 +111,8 @@ export async function POST(request: Request) {
   const { error: insertError } = await supabase.from('errors').insert(records)
   if (insertError) {
     console.error('Ingest insert error:', insertError)
-    return NextResponse.json({ error: 'Failed to store errors' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to store errors' }, { status: 500, headers: CORS_HEADERS })
   }
 
-  return NextResponse.json({ received: records.length })
+  return NextResponse.json({ received: records.length }, { headers: CORS_HEADERS })
 }
