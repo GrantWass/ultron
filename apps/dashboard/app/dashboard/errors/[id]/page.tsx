@@ -2,10 +2,158 @@ import { notFound, redirect } from 'next/navigation'
 import { createServerClient } from '@/lib/supabase/server'
 import { formatDate } from '@/lib/utils'
 import { FixSuggestion } from '@/components/fix-suggestion'
-import { FrequencyChart } from '@/components/frequency-chart'
+import { EventTypeBadge, CategoryBadge, VitalRatingBadge } from '@/components/event-badge'
 import type { ErrorRecord } from '@ultron/types'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
+
+// ── Metadata helpers ──────────────────────────────────────────────────────────
+
+function NetworkDetail({ meta }: { meta: Record<string, unknown> }) {
+  const timing = meta.timing as Record<string, number> | null
+  return (
+    <div className="space-y-4">
+      {/* Request summary */}
+      <div className="rounded-md border border-border overflow-hidden">
+        <div className="px-4 py-2 border-b border-border bg-muted/50 flex items-center justify-between">
+          <h2 className="text-sm font-medium">Request</h2>
+          {meta.category && <CategoryBadge category={String(meta.category)} />}
+        </div>
+        <div className="divide-y divide-border">
+          {[
+            ['Method',   meta.method],
+            ['URL',      meta.request_url],
+            ['Status',   meta.status ? `${meta.status}${meta.status_text ? ` ${meta.status_text}` : ''}` : '—'],
+            ['Duration', meta.duration != null ? `${meta.duration}ms` : '—'],
+            ['Page',     meta.page],
+            ['Referrer', meta.referrer ?? '—'],
+          ].map(([label, value]) => value != null && (
+            <div key={String(label)} className="px-4 py-2 flex gap-4 text-sm">
+              <span className="w-24 shrink-0 text-muted-foreground">{label}</span>
+              <span className="font-mono text-xs break-all">{String(value)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Query params */}
+      {meta.params && Object.keys(meta.params as object).length > 0 && (
+        <div className="rounded-md border border-border overflow-hidden">
+          <div className="px-4 py-2 border-b border-border bg-muted/50">
+            <h2 className="text-sm font-medium">Query Params</h2>
+          </div>
+          <div className="divide-y divide-border">
+            {Object.entries(meta.params as Record<string, string>).map(([k, v]) => (
+              <div key={k} className="px-4 py-2 flex gap-4 text-sm">
+                <span className="w-40 shrink-0 font-mono text-xs text-muted-foreground">{k}</span>
+                <span className="font-mono text-xs break-all">{v}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Timing breakdown */}
+      {timing && (
+        <div className="rounded-md border border-border overflow-hidden">
+          <div className="px-4 py-2 border-b border-border bg-muted/50">
+            <h2 className="text-sm font-medium">Timing Breakdown</h2>
+          </div>
+          <div className="p-4 flex flex-wrap gap-4">
+            {[
+              ['DNS',      timing.dns],
+              ['TCP',      timing.tcp],
+              ['TLS',      timing.tls],
+              ['TTFB',     timing.ttfb],
+              ['Transfer', timing.transfer],
+              ['Total',    timing.total],
+            ].map(([label, ms]) => (
+              <div key={String(label)} className="flex flex-col items-center gap-0.5">
+                <span className="text-xs text-muted-foreground">{label}</span>
+                <span className="font-mono text-sm font-medium">{ms}ms</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Response body */}
+      {meta.response_body && (
+        <div className="rounded-md border border-border overflow-hidden">
+          <div className="px-4 py-2 border-b border-border bg-muted/50">
+            <h2 className="text-sm font-medium">Response Body <span className="text-muted-foreground font-normal">(first 500 chars)</span></h2>
+          </div>
+          <pre className="p-4 text-xs font-mono overflow-x-auto whitespace-pre-wrap text-foreground/80">
+            {String(meta.response_body)}
+          </pre>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function VitalDetail({ meta }: { meta: Record<string, unknown> }) {
+  const thresholds: Record<string, [number, number]> = {
+    LCP:  [2500, 4000],
+    CLS:  [0.1,  0.25],
+    INP:  [200,  500],
+    FCP:  [1800, 3000],
+    TTFB: [800,  1800],
+  }
+  const name = String(meta.name ?? '')
+  const value = meta.value as number
+  const rating = String(meta.rating ?? '')
+  const [good, poor] = thresholds[name] ?? [0, 0]
+  const unit = name === 'CLS' ? '' : 'ms'
+  const displayValue = name === 'CLS' ? value?.toFixed(3) : Math.round(value)
+
+  return (
+    <div className="rounded-md border border-border overflow-hidden">
+      <div className="px-4 py-2 border-b border-border bg-muted/50 flex items-center justify-between">
+        <h2 className="text-sm font-medium">Web Vital — {name}</h2>
+        <VitalRatingBadge rating={rating} />
+      </div>
+      <div className="p-6 flex flex-col items-center gap-3">
+        <span className="text-4xl font-mono font-bold">
+          {displayValue}{unit}
+        </span>
+        <div className="text-xs text-muted-foreground text-center">
+          <span className="text-green-600">Good &lt; {name === 'CLS' ? good : `${good}ms`}</span>
+          {' · '}
+          <span className="text-red-600">Poor &gt; {name === 'CLS' ? poor : `${poor}ms`}</span>
+        </div>
+        {meta.navigationType && (
+          <span className="text-xs text-muted-foreground">Navigation: {String(meta.navigationType)}</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ResourceDetail({ meta }: { meta: Record<string, unknown> }) {
+  const src = String(meta.src ?? meta.href ?? '—')
+  return (
+    <div className="rounded-md border border-border overflow-hidden">
+      <div className="px-4 py-2 border-b border-border bg-muted/50">
+        <h2 className="text-sm font-medium">Failed Resource</h2>
+      </div>
+      <div className="divide-y divide-border">
+        {[
+          ['Tag',  meta.tagName ?? meta.tag],
+          ['URL',  src],
+          ['Page', meta.page],
+        ].map(([label, value]) => value != null && (
+          <div key={String(label)} className="px-4 py-2 flex gap-4 text-sm">
+            <span className="w-24 shrink-0 text-muted-foreground">{label}</span>
+            <span className="font-mono text-xs break-all">{String(value)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function ErrorDetailPage({
   params,
@@ -17,13 +165,9 @@ export default async function ErrorDetailPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Fetch error with project ownership check
   const { data: error } = await supabase
     .from('errors')
-    .select(`
-      *,
-      projects!inner(id, user_id, name)
-    `)
+    .select(`*, projects!inner(id, user_id, name)`)
     .eq('id', id)
     .eq('projects.user_id', user.id)
     .single()
@@ -31,8 +175,9 @@ export default async function ErrorDetailPage({
   if (!error) notFound()
 
   const err = error as ErrorRecord & { projects: { id: string; name: string } }
+  const meta = (err.metadata ?? {}) as Record<string, unknown>
+  const eventType = err.event_type ?? 'error'
 
-  // Fetch existing fix suggestion
   const { data: suggestion } = await supabase
     .from('fix_suggestions')
     .select('suggestion')
@@ -40,16 +185,6 @@ export default async function ErrorDetailPage({
     .order('created_at', { ascending: false })
     .limit(1)
     .single()
-
-  // Fetch frequency data (last 14 days)
-  const { data: frequencyData } = await supabase.rpc('error_frequency', {
-    p_message: err.message,
-    p_project_id: err.project_id,
-  }).select()
-
-  // Simple frequency fallback — count by day using client-side grouping isn't ideal
-  // We'll pass empty array and let the chart handle it gracefully
-  const chartData: { day: string; count: number }[] = []
 
   return (
     <div className="p-6 max-w-4xl space-y-6">
@@ -62,29 +197,30 @@ export default async function ErrorDetailPage({
         Back to {(error as any).projects?.name ?? 'project'}
       </Link>
 
-      {/* Error header */}
+      {/* Header */}
       <div className="space-y-2">
-        <h1 className="font-mono text-lg text-destructive font-semibold break-all">
-          {err.message}
-        </h1>
+        <div className="flex items-start gap-3">
+          <EventTypeBadge type={eventType as any} />
+          <h1 className="font-mono text-lg font-semibold break-all leading-snug">
+            {err.message}
+          </h1>
+        </div>
         <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-          {err.url && <span>URL: {err.url}</span>}
           {err.browser && <span>Browser: {err.browser}</span>}
           {err.os && <span>OS: {err.os}</span>}
+          {err.viewport && <span>Viewport: {err.viewport}</span>}
+          {err.connection && <span>Connection: {err.connection}</span>}
           {err.session_id && <span>Session: {err.session_id}</span>}
-          <span>First seen: {formatDate(err.created_at)}</span>
+          <span>{formatDate(err.created_at)}</span>
         </div>
       </div>
 
-      {/* Frequency chart */}
-      {chartData.length > 0 && (
-        <div className="rounded-md border border-border p-4">
-          <h2 className="text-sm font-medium mb-3">Error frequency (14 days)</h2>
-          <FrequencyChart data={chartData} />
-        </div>
-      )}
+      {/* Event-type-specific detail sections */}
+      {eventType === 'network' && <NetworkDetail meta={meta} />}
+      {eventType === 'vital' && <VitalDetail meta={meta} />}
+      {eventType === 'resource_error' && <ResourceDetail meta={meta} />}
 
-      {/* Stack trace */}
+      {/* Stack trace — shown for JS errors and as fallback */}
       {err.stack_trace && (
         <div className="rounded-md border border-border overflow-hidden">
           <div className="px-4 py-2 border-b border-border bg-muted/50">
@@ -96,33 +232,35 @@ export default async function ErrorDetailPage({
         </div>
       )}
 
-      {/* Metadata */}
-      {err.metadata && Object.keys(err.metadata).length > 0 && (
-        <div className="rounded-md border border-border overflow-hidden">
-          <div className="px-4 py-2 border-b border-border bg-muted/50">
-            <h2 className="text-sm font-medium">Metadata</h2>
-          </div>
+      {/* Raw metadata (for network, vitals — shows extra fields not displayed above) */}
+      {eventType !== 'error' && Object.keys(meta).length > 0 && (
+        <details className="rounded-md border border-border overflow-hidden">
+          <summary className="px-4 py-2 cursor-pointer text-sm font-medium bg-muted/50 hover:bg-muted transition-colors select-none">
+            Raw Metadata
+          </summary>
           <pre className="p-4 text-xs font-mono overflow-x-auto">
-            {JSON.stringify(err.metadata, null, 2)}
+            {JSON.stringify(meta, null, 2)}
           </pre>
-        </div>
+        </details>
       )}
 
-      {/* Fix suggestion */}
-      <div className="rounded-md border border-border overflow-hidden">
-        <div className="px-4 py-3 border-b border-border bg-muted/50">
-          <h2 className="text-sm font-medium">AI Fix Suggestion</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Powered by Claude. Connect GitHub to fetch source files for better suggestions.
-          </p>
+      {/* AI fix suggestion — only for JS errors */}
+      {eventType === 'error' && (
+        <div className="rounded-md border border-border overflow-hidden">
+          <div className="px-4 py-3 border-b border-border bg-muted/50">
+            <h2 className="text-sm font-medium">AI Fix Suggestion</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Connect GitHub to fetch source files for better suggestions.
+            </p>
+          </div>
+          <div className="p-4">
+            <FixSuggestion
+              errorId={id}
+              existingSuggestion={suggestion?.suggestion ?? null}
+            />
+          </div>
         </div>
-        <div className="p-4">
-          <FixSuggestion
-            errorId={id}
-            existingSuggestion={suggestion?.suggestion ?? null}
-          />
-        </div>
-      </div>
+      )}
     </div>
   )
 }

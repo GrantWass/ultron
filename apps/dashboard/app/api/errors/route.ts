@@ -42,10 +42,13 @@ export async function GET(request: Request) {
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
 
+  const eventType = searchParams.get('event_type')
+
   if (from) query = query.gte('created_at', from)
   if (to) query = query.lte('created_at', to)
   if (search) query = query.ilike('message', `%${search}%`)
   if (url) query = query.ilike('url', `%${url}%`)
+  if (eventType) query = query.eq('event_type', eventType)
 
   const { data, error, count } = await query
 

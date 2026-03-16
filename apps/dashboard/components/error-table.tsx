@@ -3,8 +3,17 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { formatRelativeTime, truncate } from '@/lib/utils'
-import type { ErrorRecord } from '@ultron/types'
+import { EventTypeBadge } from '@/components/event-badge'
+import type { ErrorRecord, EventType } from '@ultron/types'
 import { Search, AlertCircle, RefreshCw } from 'lucide-react'
+
+const EVENT_TYPES: { value: EventType | ''; label: string }[] = [
+  { value: '',               label: 'All' },
+  { value: 'error',          label: 'Errors' },
+  { value: 'network',        label: 'Network' },
+  { value: 'vital',          label: 'Vitals' },
+  { value: 'resource_error', label: 'Resources' },
+]
 
 interface ErrorTableProps {
   projectId: string
@@ -17,6 +26,7 @@ export function ErrorTable({ projectId }: ErrorTableProps) {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [searchInput, setSearchInput] = useState('')
+  const [eventType, setEventType] = useState<EventType | ''>('')
 
   const limit = 50
 
@@ -29,6 +39,7 @@ export function ErrorTable({ projectId }: ErrorTableProps) {
         limit: String(limit),
       })
       if (search) params.set('search', search)
+      if (eventType) params.set('event_type', eventType)
 
       const res = await fetch(`/api/errors?${params}`)
       if (!res.ok) throw new Error('Failed to fetch')
@@ -40,11 +51,9 @@ export function ErrorTable({ projectId }: ErrorTableProps) {
     } finally {
       setLoading(false)
     }
-  }, [projectId, page, search])
+  }, [projectId, page, search, eventType])
 
-  useEffect(() => {
-    fetchErrors()
-  }, [fetchErrors])
+  useEffect(() => { fetchErrors() }, [fetchErrors])
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault()
@@ -56,96 +65,107 @@ export function ErrorTable({ projectId }: ErrorTableProps) {
 
   return (
     <div className="space-y-4">
-      {/* Search bar */}
-      <form onSubmit={handleSearch} className="flex gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input
-            type="text"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search errors..."
-            className="w-full pl-9 pr-4 py-2 rounded-md border border-input bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
+      {/* Toolbar */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        {/* Event type filter tabs */}
+        <div className="flex gap-1 rounded-md border border-border p-1 bg-muted/30">
+          {EVENT_TYPES.map(({ value, label }) => (
+            <button
+              key={value}
+              onClick={() => { setEventType(value); setPage(1) }}
+              className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+                eventType === value
+                  ? 'bg-background shadow-sm text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
-        <button
-          type="submit"
-          className="rounded-md border border-input px-3 py-2 text-sm hover:bg-accent transition-colors"
-        >
-          Search
-        </button>
-        <button
-          type="button"
-          onClick={() => { setSearchInput(''); setSearch(''); setPage(1) }}
-          className="rounded-md border border-input px-3 py-2 text-sm hover:bg-accent transition-colors"
-        >
-          Clear
-        </button>
-        <button
-          type="button"
-          onClick={fetchErrors}
-          className="rounded-md border border-input px-3 py-2 hover:bg-accent transition-colors"
-          title="Refresh"
-        >
-          <RefreshCw className="h-4 w-4" />
-        </button>
-      </form>
+
+        {/* Search */}
+        <form onSubmit={handleSearch} className="flex flex-1 gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search messages..."
+              className="w-full pl-9 pr-4 py-2 rounded-md border border-input bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          </div>
+          <button type="submit" className="rounded-md border border-input px-3 py-2 text-sm hover:bg-accent transition-colors">
+            Search
+          </button>
+          {(search || searchInput) && (
+            <button
+              type="button"
+              onClick={() => { setSearchInput(''); setSearch(''); setPage(1) }}
+              className="rounded-md border border-input px-3 py-2 text-sm hover:bg-accent transition-colors"
+            >
+              Clear
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={fetchErrors}
+            className="rounded-md border border-input px-3 py-2 hover:bg-accent transition-colors"
+            title="Refresh"
+          >
+            <RefreshCw className="h-4 w-4" />
+          </button>
+        </form>
+      </div>
 
       {/* Table */}
       <div className="rounded-md border border-border overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/50">
-              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Error</th>
-              <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">URL</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground w-20">Type</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Message</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Page</th>
               <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell">Browser</th>
-              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Time</th>
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground whitespace-nowrap">Time</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
-                  Loading...
-                </td>
+                <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">Loading...</td>
               </tr>
             ) : errors.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-4 py-12 text-center">
+                <td colSpan={5} className="px-4 py-12 text-center">
                   <div className="flex flex-col items-center gap-2">
                     <AlertCircle className="h-8 w-8 text-muted-foreground/50" />
-                    <p className="text-muted-foreground">No errors yet</p>
-                    <p className="text-xs text-muted-foreground/70">
-                      Install the SDK and errors will appear here
-                    </p>
+                    <p className="text-muted-foreground">No events yet</p>
+                    <p className="text-xs text-muted-foreground/70">Install the SDK and events will appear here</p>
                   </div>
                 </td>
               </tr>
             ) : (
               errors.map((error) => (
-                <tr
-                  key={error.id}
-                  className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
-                >
+                <tr key={error.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
                   <td className="px-4 py-3">
-                    <Link
-                      href={`/dashboard/errors/${error.id}`}
-                      className="block hover:text-primary transition-colors"
-                    >
-                      <span className="font-mono text-xs text-destructive">
-                        {truncate(error.message, 80)}
+                    <EventTypeBadge type={error.event_type ?? 'error'} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <Link href={`/dashboard/errors/${error.id}`} className="block hover:text-primary transition-colors">
+                      <span className="font-mono text-xs text-foreground/80">
+                        {truncate(error.message, 90)}
                       </span>
                     </Link>
                   </td>
                   <td className="px-4 py-3 hidden md:table-cell">
                     <span className="text-muted-foreground text-xs">
-                      {error.url ? truncate(error.url, 40) : '—'}
+                      {error.url ? truncate(new URL(error.url).pathname, 40) : '—'}
                     </span>
                   </td>
                   <td className="px-4 py-3 hidden lg:table-cell">
-                    <span className="text-muted-foreground text-xs">
-                      {error.browser ?? '—'}
-                    </span>
+                    <span className="text-muted-foreground text-xs">{error.browser ?? '—'}</span>
                   </td>
                   <td className="px-4 py-3">
                     <span className="text-muted-foreground text-xs whitespace-nowrap">
