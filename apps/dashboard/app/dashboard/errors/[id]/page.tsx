@@ -17,7 +17,7 @@ function NetworkDetail({ meta }: { meta: Record<string, unknown> }) {
       <div className="rounded-md border border-border overflow-hidden">
         <div className="px-4 py-2 border-b border-border bg-muted/50 flex items-center justify-between">
           <h2 className="text-sm font-medium">Request</h2>
-          {meta.category && <CategoryBadge category={String(meta.category)} />}
+          {typeof meta.category === 'string' && <CategoryBadge category={meta.category} />}
         </div>
         <div className="divide-y divide-border">
           {[
@@ -27,17 +27,17 @@ function NetworkDetail({ meta }: { meta: Record<string, unknown> }) {
             ['Duration', meta.duration != null ? `${meta.duration}ms` : '—'],
             ['Page',     meta.page],
             ['Referrer', meta.referrer ?? '—'],
-          ].map(([label, value]) => value != null && (
+          ].map(([label, value]) => value != null ? (
             <div key={String(label)} className="px-4 py-2 flex gap-4 text-sm">
-              <span className="w-24 shrink-0 text-muted-foreground">{label}</span>
+              <span className="w-24 shrink-0 text-muted-foreground">{String(label)}</span>
               <span className="font-mono text-xs break-all">{String(value)}</span>
             </div>
-          ))}
+          ) : null)}
         </div>
       </div>
 
       {/* Query params */}
-      {meta.params && Object.keys(meta.params as object).length > 0 && (
+      {meta.params != null && Object.keys(meta.params as object).length > 0 && (
         <div className="rounded-md border border-border overflow-hidden">
           <div className="px-4 py-2 border-b border-border bg-muted/50">
             <h2 className="text-sm font-medium">Query Params</h2>
@@ -54,7 +54,7 @@ function NetworkDetail({ meta }: { meta: Record<string, unknown> }) {
       )}
 
       {/* Timing breakdown */}
-      {timing && (
+      {timing != null && (
         <div className="rounded-md border border-border overflow-hidden">
           <div className="px-4 py-2 border-b border-border bg-muted/50">
             <h2 className="text-sm font-medium">Timing Breakdown</h2>
@@ -69,8 +69,8 @@ function NetworkDetail({ meta }: { meta: Record<string, unknown> }) {
               ['Total',    timing.total],
             ].map(([label, ms]) => (
               <div key={String(label)} className="flex flex-col items-center gap-0.5">
-                <span className="text-xs text-muted-foreground">{label}</span>
-                <span className="font-mono text-sm font-medium">{ms}ms</span>
+                <span className="text-xs text-muted-foreground">{String(label)}</span>
+                <span className="font-mono text-sm font-medium">{String(ms)}ms</span>
               </div>
             ))}
           </div>
@@ -78,7 +78,7 @@ function NetworkDetail({ meta }: { meta: Record<string, unknown> }) {
       )}
 
       {/* Response body */}
-      {meta.response_body && (
+      {meta.response_body != null && (
         <div className="rounded-md border border-border overflow-hidden">
           <div className="px-4 py-2 border-b border-border bg-muted/50">
             <h2 className="text-sm font-medium">Response Body <span className="text-muted-foreground font-normal">(first 500 chars)</span></h2>
@@ -122,7 +122,7 @@ function VitalDetail({ meta }: { meta: Record<string, unknown> }) {
           {' · '}
           <span className="text-red-600">Poor &gt; {name === 'CLS' ? poor : `${poor}ms`}</span>
         </div>
-        {meta.navigationType && (
+        {meta.navigationType != null && (
           <span className="text-xs text-muted-foreground">Navigation: {String(meta.navigationType)}</span>
         )}
       </div>
@@ -142,12 +142,12 @@ function ResourceDetail({ meta }: { meta: Record<string, unknown> }) {
           ['Tag',  meta.tagName ?? meta.tag],
           ['URL',  src],
           ['Page', meta.page],
-        ].map(([label, value]) => value != null && (
+        ].map(([label, value]) => value != null ? (
           <div key={String(label)} className="px-4 py-2 flex gap-4 text-sm">
-            <span className="w-24 shrink-0 text-muted-foreground">{label}</span>
+            <span className="w-24 shrink-0 text-muted-foreground">{String(label)}</span>
             <span className="font-mono text-xs break-all">{String(value)}</span>
           </div>
-        ))}
+        ) : null)}
       </div>
     </div>
   )
