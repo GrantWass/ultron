@@ -15,10 +15,23 @@ const THRESHOLDS = {
 
 type VitalName = keyof typeof THRESHOLDS
 
+function getNavigationContext(): Record<string, unknown> {
+  try {
+    const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined
+    if (!nav) return {}
+    return {
+      navigationType: nav.type,
+      ttfb: Math.round(nav.responseStart - nav.requestStart),
+      redirectCount: nav.redirectCount || undefined,
+    }
+  } catch { return {} }
+}
+
 function makePayload(
   name: VitalName,
   value: number,
-  rating: 'good' | 'needs-improvement' | 'poor'
+  rating: 'good' | 'needs-improvement' | 'poor',
+  extra?: Record<string, unknown>
 ): ErrorPayload {
   const ua = navigator.userAgent
   return {
@@ -31,7 +44,7 @@ function makePayload(
     viewport: getViewport(),
     connection: getConnection(),
     session_id: getSessionId(),
-    metadata: { name, value, rating },
+    metadata: { name, value, rating, ...extra },
     timestamp: Date.now(),
   }
 }
@@ -51,10 +64,10 @@ function getRating(name: VitalName, value: number): 'good' | 'needs-improvement'
 export function collectVitals(queue: ErrorQueue, config: TrackerConfig): void {
   const reportAll = config.reportAllVitals ?? false
 
-  function report(name: VitalName, value: number) {
+  function report(name: VitalName, value: number, extra?: Record<string, unknown>) {
     const rating = getRating(name, value)
     if (reportAll || rating !== 'good') {
-      queue.enqueue(makePayload(name, value, rating))
+      queue.enqueue(makePayload(name, value, rating, extra))
     }
   }
 
@@ -63,17 +76,36 @@ export function collectVitals(queue: ErrorQueue, config: TrackerConfig): void {
   // ── LCP ──────────────────────────────────────────────────────────────────
   try {
     let lcpValue = 0
+    let lcpExtra: Record<string, unknown> = {}
     const lcpObs = new PerformanceObserver((list) => {
       const entries = list.getEntries()
-      const last = entries[entries.length - 1] as PerformanceEntry & { startTime: number }
+      const last = entries[entries.length - 1] as PerformanceEntry & {
+        startTime: number
+        element?: Element
+        url?: string
+        loadTime?: number
+        renderTime?: number
+        size?: number
+      }
       lcpValue = last.startTime
+      const el = last.element
+      lcpExtra = {
+        element: el
+          ? [el.tagName.toLowerCase(), el.id ? `#${el.id}` : '', el.className ? `.${String(el.className).trim().split(/\s+/).join('.')}` : ''].join('') || el.tagName.toLowerCase()
+          : null,
+        url: last.url || null,
+        loadTime: last.loadTime ? Math.round(last.loadTime) : null,
+        renderTime: last.renderTime ? Math.round(last.renderTime) : null,
+        size: last.size ?? null,
+        ...getNavigationContext(),
+      }
     })
     lcpObs.observe({ type: 'largest-contentful-paint', buffered: true })
 
     // Report on page hide — LCP is finalized when user leaves
     addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden' && lcpValue > 0) {
-        report('LCP', lcpValue)
+        report('LCP', lcpValue, lcpExtra)
         lcpObs.disconnect()
       }
     }, { once: true })
@@ -123,7 +155,7 @@ export function collectVitals(queue: ErrorQueue, config: TrackerConfig): void {
     const fcpObs = new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {
         if (entry.name === 'first-contentful-paint') {
-          report('FCP', entry.startTime)
+          report('FCP', entry.startTime, getNavigationContext())
           fcpObs.disconnect()
         }
       }

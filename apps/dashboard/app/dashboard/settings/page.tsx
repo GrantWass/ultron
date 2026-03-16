@@ -4,7 +4,163 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 import type { Project, GithubConnection } from '@ultron/types'
-import { Key, Github, Copy, Check, ExternalLink } from 'lucide-react'
+import { Key, Github, Copy, Check, ExternalLink, Code2 } from 'lucide-react'
+
+// ── SDK Setup ─────────────────────────────────────────────────────────────────
+
+type Framework = 'nextjs' | 'react' | 'vue' | 'sveltekit' | 'vanilla'
+
+const FRAMEWORKS: { value: Framework; label: string }[] = [
+  { value: 'nextjs',    label: 'Next.js' },
+  { value: 'react',     label: 'React' },
+  { value: 'vue',       label: 'Vue 3' },
+  { value: 'sveltekit', label: 'SvelteKit' },
+  { value: 'vanilla',   label: 'Vanilla JS' },
+]
+
+function getSnippet(fw: Framework, apiKey: string, endpoint: string): string {
+  const pkg = 'npm install @ultron-dev/tracker'
+  switch (fw) {
+    case 'nextjs': return `${pkg}
+
+// components/ultron.tsx
+import { initTracker } from '@ultron-dev/tracker'
+
+if (typeof window !== 'undefined') {
+  initTracker({
+    apiKey: '${apiKey}',
+    endpoint: '${endpoint}',
+    debug: process.env.NODE_ENV === 'development',
+  })
+}
+
+export function Ultron() { return null }
+
+// app/layout.tsx  — add <Ultron /> inside <body>
+import { Ultron } from '@/components/ultron'
+
+// app/global-error.tsx  — catch SSR/hydration errors
+'use client'
+import { useEffect } from 'react'
+import { initTracker, captureError } from '@ultron-dev/tracker'
+
+export default function GlobalError({ error }: { error: Error }) {
+  useEffect(() => {
+    initTracker({ apiKey: '${apiKey}', endpoint: '${endpoint}' })
+    captureError(error)
+  }, [error])
+  return <html><body><h1>Something went wrong</h1></body></html>
+}`
+
+    case 'react': return `${pkg}
+
+// main.tsx
+import { initTracker } from '@ultron-dev/tracker'
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import App from './App'
+
+initTracker({
+  apiKey: '${apiKey}',
+  endpoint: '${endpoint}',
+  debug: import.meta.env.DEV,
+})
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode><App /></StrictMode>
+)`
+
+    case 'vue': return `${pkg}
+
+// main.ts
+import { createApp } from 'vue'
+import { initTracker } from '@ultron-dev/tracker'
+import App from './App.vue'
+
+initTracker({
+  apiKey: '${apiKey}',
+  endpoint: '${endpoint}',
+  debug: import.meta.env.DEV,
+})
+
+createApp(App).mount('#app')`
+
+    case 'sveltekit': return `${pkg}
+
+// src/hooks.client.ts
+import { initTracker } from '@ultron-dev/tracker'
+import { PUBLIC_ULTRON_API_KEY, PUBLIC_ULTRON_ENDPOINT } from '$env/static/public'
+
+initTracker({
+  apiKey: PUBLIC_ULTRON_API_KEY,
+  endpoint: PUBLIC_ULTRON_ENDPOINT,
+  debug: import.meta.env.DEV,
+})
+
+// .env
+PUBLIC_ULTRON_API_KEY=${apiKey}
+PUBLIC_ULTRON_ENDPOINT=${endpoint}`
+
+    case 'vanilla': return `<script type="module">
+  import { initTracker } from 'https://cdn.jsdelivr.net/npm/@ultron-dev/tracker/dist/index.js'
+
+  initTracker({
+    apiKey: '${apiKey}',
+    endpoint: '${endpoint}',
+  })
+</script>`
+  }
+}
+
+function SdkSetup({ apiKey, endpoint }: { apiKey: string; endpoint: string }) {
+  const [framework, setFramework] = useState<Framework>('nextjs')
+  const [copied, setCopied] = useState(false)
+  const snippet = getSnippet(framework, apiKey, endpoint)
+
+  async function copySnippet() {
+    await navigator.clipboard.writeText(snippet)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="rounded-md border border-border overflow-hidden bg-muted/30">
+      <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-3 flex-wrap">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <Code2 className="h-3.5 w-3.5" />
+          SDK Setup
+        </h3>
+        <div className="flex gap-1 rounded-md border border-border p-1 bg-background">
+          {FRAMEWORKS.map(({ value, label }) => (
+            <button
+              key={value}
+              onClick={() => setFramework(value)}
+              className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+                framework === value
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="relative">
+        <pre className="text-xs font-mono bg-background p-4 overflow-x-auto leading-relaxed">
+          {snippet}
+        </pre>
+        <button
+          onClick={copySnippet}
+          className="absolute top-2.5 right-2.5 flex items-center gap-1 rounded border border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {copied ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3" />}
+          {copied ? 'Copied!' : 'Copy'}
+        </button>
+      </div>
+    </div>
+  )
+}
 
 function SettingsContent() {
   const searchParams = useSearchParams()
@@ -143,21 +299,10 @@ function SettingsContent() {
           </div>
 
           {/* SDK Install instructions */}
-          <div className="rounded-md border border-border p-4 space-y-3 bg-muted/30">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              SDK Setup
-            </h3>
-            <pre className="text-xs font-mono bg-background rounded p-3 border border-border overflow-x-auto">
-{`npm install @ultron/tracker
-
-import { initTracker } from '@ultron/tracker'
-
-initTracker({
-  apiKey: '${selectedProject.api_key}',
-  endpoint: '${typeof window !== 'undefined' ? window.location.origin : 'https://yourdomain.com'}'
-})`}
-            </pre>
-          </div>
+          <SdkSetup
+            apiKey={selectedProject.api_key}
+            endpoint={typeof window !== 'undefined' ? window.location.origin : 'https://yourdomain.com'}
+          />
         </div>
       )}
 

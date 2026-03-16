@@ -107,6 +107,17 @@ function VitalDetail({ meta }: { meta: Record<string, unknown> }) {
   const unit = name === 'CLS' ? '' : 'ms'
   const displayValue = name === 'CLS' ? value?.toFixed(3) : Math.round(value)
 
+  const contextRows = [
+    meta.navigationType != null && ['Navigation',  String(meta.navigationType)],
+    meta.ttfb         != null && ['TTFB',         `${meta.ttfb}ms`],
+    meta.redirectCount  != null && Number(meta.redirectCount) > 0 && ['Redirects', String(meta.redirectCount)],
+    meta.element      != null && ['LCP Element',  String(meta.element)],
+    meta.url          != null && ['Resource URL', String(meta.url)],
+    meta.loadTime     != null && ['Load Time',    `${meta.loadTime}ms`],
+    meta.renderTime   != null && ['Render Time',  `${meta.renderTime}ms`],
+    meta.size         != null && ['Element Size', `${meta.size}px²`],
+  ].filter(Boolean) as [string, string][]
+
   return (
     <div className="rounded-md border border-border overflow-hidden">
       <div className="px-4 py-2 border-b border-border bg-muted/50 flex items-center justify-between">
@@ -122,10 +133,17 @@ function VitalDetail({ meta }: { meta: Record<string, unknown> }) {
           {' · '}
           <span className="text-red-600">Poor &gt; {name === 'CLS' ? poor : `${poor}ms`}</span>
         </div>
-        {meta.navigationType != null && (
-          <span className="text-xs text-muted-foreground">Navigation: {String(meta.navigationType)}</span>
-        )}
       </div>
+      {contextRows.length > 0 && (
+        <div className="divide-y divide-border border-t border-border">
+          {contextRows.map(([label, val]) => (
+            <div key={label} className="px-4 py-2 flex gap-4 text-sm">
+              <span className="w-28 shrink-0 text-muted-foreground">{label}</span>
+              <span className="font-mono text-xs break-all">{val}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
