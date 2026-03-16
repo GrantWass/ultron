@@ -24,33 +24,23 @@ function getSnippet(fw: Framework, apiKey: string, endpoint: string): string {
     case 'nextjs': return `${pkg}
 
 // components/ultron.tsx
-import { initTracker } from '@ultron-dev/tracker'
-
-if (typeof window !== 'undefined') {
-  initTracker({
-    apiKey: '${apiKey}',
-    endpoint: '${endpoint}',
-    debug: process.env.NODE_ENV === 'development',
-  })
-}
-
-export function Ultron() { return null }
-
-// app/layout.tsx  — add <Ultron /> inside <body>
-import { Ultron } from '@/components/ultron'
-
-// app/global-error.tsx  — catch SSR/hydration errors
 'use client'
 import { useEffect } from 'react'
-import { initTracker, captureError } from '@ultron-dev/tracker'
+import { initTracker } from '@ultron-dev/tracker'
 
-export default function GlobalError({ error }: { error: Error }) {
+export function Ultron() {
   useEffect(() => {
-    initTracker({ apiKey: '${apiKey}', endpoint: '${endpoint}' })
-    captureError(error)
-  }, [error])
-  return <html><body><h1>Something went wrong</h1></body></html>
-}`
+    initTracker({
+      apiKey: '${apiKey}',
+      endpoint: '${endpoint}',
+      debug: process.env.NODE_ENV === 'development',
+    })
+  }, [])
+  return null
+}
+
+// app/layout.tsx  — add <Ultron /> inside <body>
+import { Ultron } from '@/components/ultron'`
 
     case 'react': return `${pkg}
 
