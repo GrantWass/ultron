@@ -64,7 +64,7 @@ export default async function RootPage() {
           <p className="text-lg text-muted-foreground text-center max-w-2xl mx-auto mb-10 leading-relaxed">
             Lightweight error monitoring for single devs and small teams. Catch JS errors,
             slow network requests, and web vitals across all of your projects — then let AI tell you exactly how to fix them.
-            Paste 5 lines and you're live.
+            Paste 4 lines and you're live.
           </p>
 
           {/* CTAs */}
@@ -184,7 +184,6 @@ export default async function RootPage() {
             <span className="text-primary">{'import'}</span>{' { initTracker } '}<span className="text-primary">{'from'}</span>{' '}<span className="text-green-600 dark:text-green-400">{`'@ultron-dev/tracker'`}</span>{'\n\n'}
             {'initTracker({\n'}
             {'  apiKey: '}<span className="text-green-600 dark:text-green-400">{`'your-api-key'`}</span>{',\n'}
-            {'  endpoint: '}<span className="text-green-600 dark:text-green-400">{`'https://yourapp.com'`}</span>{',\n'}
             {'})\n\n'}
             <span className="text-muted-foreground">{`# 3. that's it`}</span>
           </pre>
@@ -292,7 +291,7 @@ export default async function RootPage() {
                 icon: <Zap className="h-4 w-4" />,
                 title: 'Add 3 lines to your app',
                 desc: 'Call initTracker once at startup. No config files, no build steps, no source map uploads.',
-                code: `initTracker({ apiKey: '...', endpoint: '...' })`,
+                code: `initTracker({ apiKey: '...' })`,
               },
               {
                 n: '3',

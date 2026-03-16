@@ -32,7 +32,7 @@ export class UltronTracker {
     this.queue.start()
 
     if (this.config.debug) {
-      console.debug('[Ultron] Tracker initialized for endpoint:', this.config.endpoint)
+      console.debug('[Ultron] Tracker initialized')
     }
   }
 

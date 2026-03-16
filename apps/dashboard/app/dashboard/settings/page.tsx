@@ -18,7 +18,7 @@ const FRAMEWORKS: { value: Framework; label: string }[] = [
   { value: 'vanilla',   label: 'Vanilla JS' },
 ]
 
-function getSnippet(fw: Framework, apiKey: string, endpoint: string): string {
+function getSnippet(fw: Framework, apiKey: string): string {
   const pkg = 'npm install @ultron-dev/tracker'
   switch (fw) {
     case 'nextjs': return `${pkg}
@@ -32,7 +32,6 @@ export function Ultron() {
   useEffect(() => {
     initTracker({
       apiKey: '${apiKey}',
-      endpoint: '${endpoint}',
       debug: process.env.NODE_ENV === 'development',
     })
   }, [])
@@ -52,7 +51,6 @@ import App from './App'
 
 initTracker({
   apiKey: '${apiKey}',
-  endpoint: '${endpoint}',
   debug: import.meta.env.DEV,
 })
 
@@ -69,7 +67,6 @@ import App from './App.vue'
 
 initTracker({
   apiKey: '${apiKey}',
-  endpoint: '${endpoint}',
   debug: import.meta.env.DEV,
 })
 
@@ -79,33 +76,28 @@ createApp(App).mount('#app')`
 
 // src/hooks.client.ts
 import { initTracker } from '@ultron-dev/tracker'
-import { PUBLIC_ULTRON_API_KEY, PUBLIC_ULTRON_ENDPOINT } from '$env/static/public'
+import { PUBLIC_ULTRON_API_KEY } from '$env/static/public'
 
 initTracker({
   apiKey: PUBLIC_ULTRON_API_KEY,
-  endpoint: PUBLIC_ULTRON_ENDPOINT,
   debug: import.meta.env.DEV,
 })
 
 // .env
-PUBLIC_ULTRON_API_KEY=${apiKey}
-PUBLIC_ULTRON_ENDPOINT=${endpoint}`
+PUBLIC_ULTRON_API_KEY=${apiKey}`
 
     case 'vanilla': return `<script type="module">
   import { initTracker } from 'https://cdn.jsdelivr.net/npm/@ultron-dev/tracker/dist/index.js'
 
-  initTracker({
-    apiKey: '${apiKey}',
-    endpoint: '${endpoint}',
-  })
+  initTracker({ apiKey: '${apiKey}' })
 </script>`
   }
 }
 
-function SdkSetup({ apiKey, endpoint }: { apiKey: string; endpoint: string }) {
+function SdkSetup({ apiKey }: { apiKey: string }) {
   const [framework, setFramework] = useState<Framework>('nextjs')
   const [copied, setCopied] = useState(false)
-  const snippet = getSnippet(framework, apiKey, endpoint)
+  const snippet = getSnippet(framework, apiKey)
 
   async function copySnippet() {
     await navigator.clipboard.writeText(snippet)
@@ -289,10 +281,7 @@ function SettingsContent() {
           </div>
 
           {/* SDK Install instructions */}
-          <SdkSetup
-            apiKey={selectedProject.api_key}
-            endpoint={typeof window !== 'undefined' ? window.location.origin : 'https://yourdomain.com'}
-          />
+          <SdkSetup apiKey={selectedProject.api_key} />
         </div>
       )}
 

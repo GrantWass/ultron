@@ -2,6 +2,7 @@ import type { ErrorPayload, IngestBody, TrackerConfig } from './types'
 
 const FLUSH_INTERVAL_MS = 5000
 const MAX_QUEUE_SIZE = 50
+const INGEST_URL = 'https://ultron-ecru.vercel.app/api/ingest'
 
 export class ErrorQueue {
   private queue: ErrorPayload[] = []
@@ -50,7 +51,7 @@ export class ErrorQueue {
 
     const batch = this.queue.splice(0, this.queue.length)
     const body: IngestBody = { errors: batch }
-    const endpoint = `${this.config.endpoint}/api/ingest`
+    const endpoint = INGEST_URL
 
     try {
       const res = await fetch(endpoint, {
@@ -79,7 +80,7 @@ export class ErrorQueue {
     if (this.queue.length === 0) return
 
     const batch = this.queue.splice(0, this.queue.length)
-    const endpoint = `${this.config.endpoint}/api/ingest`
+    const endpoint = INGEST_URL
 
     // sendBeacon cannot set custom headers — include api_key in body
     const body: IngestBody = { errors: batch, api_key: this.config.apiKey }

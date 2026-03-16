@@ -132,15 +132,8 @@ function isCorsError(reqUrl: string, errStr: string): boolean {
   )
 }
 
-function shouldIgnore(reqUrl: string, endpoint: string): boolean {
-  try {
-    const endpointHost = new URL(endpoint).hostname
-    const reqHost = reqUrl.startsWith('http') ? new URL(reqUrl).hostname : null
-    if (reqHost && reqHost === endpointHost && reqUrl.includes('/api/ingest')) return true
-  } catch {
-    if (reqUrl.includes('/api/ingest')) return true
-  }
-  return false
+function shouldIgnore(reqUrl: string): boolean {
+  return reqUrl.includes('ultron-ecru.vercel.app/api/ingest')
 }
 
 // ── Fetch ─────────────────────────────────────────────────────────────────
@@ -155,7 +148,7 @@ export function monitorNetwork(queue: ErrorQueue, config: TrackerConfig): void {
       : input instanceof Request ? input.url
       : String(input)
 
-    if (shouldIgnore(reqUrl, config.endpoint)) return origFetch(input, init)
+    if (shouldIgnore(reqUrl)) return origFetch(input, init)
 
     const method = (
       init?.method ?? (input instanceof Request ? input.method : 'GET')
@@ -246,7 +239,7 @@ export function monitorNetwork(queue: ErrorQueue, config: TrackerConfig): void {
     const reqUrl: string = this.__ultron_url ?? ''
     const start = Date.now()
 
-    if (!shouldIgnore(reqUrl, config.endpoint)) {
+    if (!shouldIgnore(reqUrl)) {
       this.addEventListener('loadend', () => {
         const duration = Date.now() - start
         const status: number = this.status

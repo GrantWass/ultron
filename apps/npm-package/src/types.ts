@@ -1,6 +1,5 @@
 export interface TrackerConfig {
   apiKey: string
-  endpoint: string
   debug?: boolean
   /** Report all web vitals, not just poor ones. Default: false */
   reportAllVitals?: boolean

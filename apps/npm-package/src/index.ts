@@ -15,7 +15,6 @@ let instance: UltronTracker | null = null
  *
  * initTracker({
  *   apiKey: 'your-project-api-key',
- *   endpoint: 'https://yourdomain.com'
  * })
  * ```
  */
@@ -25,13 +24,8 @@ export function initTracker(config: TrackerConfig): UltronTracker {
   }
 
   if (!config.apiKey) throw new Error('[Ultron] apiKey is required')
-  if (!config.endpoint) throw new Error('[Ultron] endpoint is required')
 
-  // Normalize endpoint — strip trailing slash
-  const normalizedConfig: TrackerConfig = {
-    ...config,
-    endpoint: config.endpoint.replace(/\/$/, ''),
-  }
+  const normalizedConfig: TrackerConfig = { ...config }
 
   instance = new UltronTracker(normalizedConfig)
   instance.init()
