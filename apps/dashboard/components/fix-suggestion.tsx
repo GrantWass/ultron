@@ -2,14 +2,15 @@
 
 import { useState } from 'react'
 import { useCompletion } from 'ai/react'
-import { Wand2, Loader2 } from 'lucide-react'
+import { Wand2, Loader2, Github, Info } from 'lucide-react'
 
 interface FixSuggestionProps {
   errorId: string
   existingSuggestion?: string | null
+  githubRepo?: string | null
 }
 
-export function FixSuggestion({ errorId, existingSuggestion }: FixSuggestionProps) {
+export function FixSuggestion({ errorId, existingSuggestion, githubRepo }: FixSuggestionProps) {
   const [showFix, setShowFix] = useState(!!existingSuggestion)
 
   const { complete, completion, isLoading, error } = useCompletion({
@@ -27,6 +28,22 @@ export function FixSuggestion({ errorId, existingSuggestion }: FixSuggestionProp
 
   return (
     <div className="space-y-4">
+      {/* GitHub context indicator */}
+      {githubRepo ? (
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Github className="h-3.5 w-3.5 shrink-0" />
+          <span>Using source files from <span className="font-medium text-foreground">{githubRepo}</span></span>
+          <span title="The AI will fetch relevant source files from this repo based on the stack trace to give more accurate fix suggestions." className="cursor-help">
+            <Info className="h-3.5 w-3.5" />
+          </span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Info className="h-3.5 w-3.5 shrink-0" />
+          <span>No GitHub repo connected — AI will infer from the stack trace only. <a href="/dashboard/settings" className="underline hover:text-foreground transition-colors">Connect in Settings.</a></span>
+        </div>
+      )}
+
       {!showFix && (
         <button
           onClick={handleSuggestFix}

@@ -232,13 +232,20 @@ export default async function ErrorDetailPage({
   const meta = (err.metadata ?? {}) as Record<string, unknown>
   const eventType = err.event_type ?? 'error'
 
-  const { data: suggestion } = await supabase
-    .from('fix_suggestions')
-    .select('suggestion')
-    .eq('error_id', id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single()
+  const [{ data: suggestion }, { data: githubConn }] = await Promise.all([
+    supabase
+      .from('fix_suggestions')
+      .select('suggestion')
+      .eq('error_id', id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single(),
+    serviceClient
+      .from('github_connections')
+      .select('repo_owner, repo_name')
+      .eq('project_id', projectId)
+      .maybeSingle(),
+  ])
 
   return (
     <div className="p-6 max-w-4xl space-y-6">
@@ -310,14 +317,14 @@ export default async function ErrorDetailPage({
         <div className="rounded-md border border-border overflow-hidden">
           <div className="px-4 py-3 border-b border-border bg-muted/50">
             <h2 className="text-sm font-medium">AI Fix Suggestion</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Connect GitHub to fetch source files for better suggestions.
-            </p>
           </div>
           <div className="p-4">
             <FixSuggestion
               errorId={id}
               existingSuggestion={suggestion?.suggestion ?? null}
+              githubRepo={githubConn?.repo_owner && githubConn?.repo_name
+                ? `${githubConn.repo_owner}/${githubConn.repo_name}`
+                : null}
             />
           </div>
         </div>

@@ -1,6 +1,6 @@
 import { streamText } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
-import { createServerClient } from '@/lib/supabase/server'
+import { createServerClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { parseStackTrace } from '@/lib/stack-parser'
 import { fetchGitHubFiles } from '@/lib/github'
 import type { ErrorRecord, RelevantFile } from '@ultron/types'
@@ -70,8 +70,9 @@ export async function POST(request: Request) {
     })
   }
 
-  // Fetch error with project ownership check
-  const { data: error } = await supabase
+  // Fetch error via service role, then verify caller is owner or accepted member
+  const service = createServiceRoleClient()
+  const { data: error } = await service
     .from('errors')
     .select(`
       *,
@@ -86,7 +87,6 @@ export async function POST(request: Request) {
       )
     `)
     .eq('id', errorId)
-    .eq('projects.user_id', user.id)
     .single()
 
   if (!error) {
@@ -96,8 +96,26 @@ export async function POST(request: Request) {
     })
   }
 
+  const projectId = (error as any).projects?.id
+  const isOwner = (error as any).projects?.user_id === user.id
+  if (!isOwner) {
+    const { data: memberRow } = await service
+      .from('project_members')
+      .select('id')
+      .eq('project_id', projectId)
+      .eq('user_id', user.id)
+      .eq('status', 'accepted')
+      .maybeSingle()
+    if (!memberRow) {
+      return new Response(JSON.stringify({ error: 'Error not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+  }
+
   // Check for existing suggestion
-  const { data: existing } = await supabase
+  const { data: existing } = await service
     .from('fix_suggestions')
     .select('suggestion')
     .eq('error_id', errorId)
@@ -123,6 +141,8 @@ export async function POST(request: Request) {
   let files: RelevantFile[] = []
   const githubConn = (error as any).projects?.github_connections?.[0]
 
+  // TODO: delete
+  console.log('[fix] Raw projects data:', JSON.stringify((error as any).projects, null, 2))
   // TODO: delete
   console.log('[fix] GitHub connection present:', !!githubConn)
   // TODO: delete
@@ -172,7 +192,7 @@ export async function POST(request: Request) {
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 4096,
     onFinish: async ({ text }) => {
-      await supabase.from('fix_suggestions').insert({
+      await service.from('fix_suggestions').insert({
         error_id: errorId,
         suggestion: text,
         relevant_files: files,
