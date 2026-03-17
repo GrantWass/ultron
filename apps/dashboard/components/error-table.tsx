@@ -232,7 +232,7 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
 
   // TODO: delete — test error to verify Ultron tracker is capturing
   useEffect(() => {
-    console.error('Ultron test error: tracker smoke test from dashboard')
+    console.error('Ultron smoke test — delete me')
   }, [])
   const searchRef = useRef<HTMLInputElement>(null)
 

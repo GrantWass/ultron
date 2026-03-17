@@ -42,7 +42,8 @@ Based on the error and available context, provide:
 3. **Edge Cases** — Any related issues or edge cases to watch for
 
 If no source files are available or they do not give insightful information, infer the fix from the error message and stack trace alone.
-Be direct and actionable. Do not ask follow-up questions. Do not suggest the developer provide more information. This is a one-shot recommendation.`
+Be direct and actionable. Do not ask follow-up questions. Do not suggest the developer provide more information. This is a one-shot recommendation.
+Output only the three sections above — no preamble, no closing remarks, no meta-commentary about the format or the response itself.`
 }
 
 export async function POST(request: Request) {

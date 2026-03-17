@@ -14,6 +14,7 @@ export class UltronTracker {
 
   private originalOnError: OnErrorEventHandler | null = null
   private originalOnUnhandledRejection: ((e: PromiseRejectionEvent) => void) | null = null
+  private originalConsoleError: ((...args: unknown[]) => void) | null = null
   private removeResourceErrorListener: (() => void) | null = null
 
   constructor(config: TrackerConfig) {
@@ -26,6 +27,7 @@ export class UltronTracker {
     this.attached = true
 
     this.attachErrorListeners()
+    this.patchConsoleError()
     this.removeResourceErrorListener = monitorResourceErrors(this.queue, this.config)
     monitorNetwork(this.queue, this.config)
     collectVitals(this.queue, this.config)
@@ -50,6 +52,19 @@ export class UltronTracker {
       session_id: getSessionId(),
       metadata,
       timestamp: Date.now(),
+    }
+  }
+
+  private patchConsoleError(): void {
+    this.originalConsoleError = console.error.bind(console)
+    const tracker = this
+    console.error = (...args: unknown[]) => {
+      tracker.originalConsoleError!(...args)
+      if (!tracker.capturing) {
+        const msg = args.map((a) => (a instanceof Error ? a.message : String(a))).join(' ')
+        const err = args.find((a) => a instanceof Error) as Error | undefined
+        tracker.captureError(err ?? new Error(msg), { source: 'console.error' })
+      }
     }
   }
 
@@ -93,6 +108,7 @@ export class UltronTracker {
     if (this.originalOnUnhandledRejection) {
       window.removeEventListener('unhandledrejection', this.originalOnUnhandledRejection)
     }
+    if (this.originalConsoleError) console.error = this.originalConsoleError
     if (this.removeResourceErrorListener) this.removeResourceErrorListener()
     this.attached = false
   }
