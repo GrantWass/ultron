@@ -13,12 +13,10 @@ export default async function ProjectErrorsPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: project } = await supabase
-    .from('projects')
-    .select('*')
-    .eq('id', id)
-    .eq('user_id', user.id)
-    .single()
+  const [{ data: project }, { data: allProjects }] = await Promise.all([
+    supabase.from('projects').select('*').eq('id', id).eq('user_id', user.id).single(),
+    supabase.from('projects').select('id, name').eq('user_id', user.id).order('created_at', { ascending: false }),
+  ])
 
   if (!project) notFound()
 
@@ -30,7 +28,7 @@ export default async function ProjectErrorsPage({
           Error feed — click any error for details and AI fix suggestions
         </p>
       </div>
-      <ErrorTable projectId={id} />
+      <ErrorTable projectId={id} projects={allProjects ?? []} />
     </div>
   )
 }

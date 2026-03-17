@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { formatRelativeTime, truncate } from '@/lib/utils'
 import { EventTypeBadge } from '@/components/event-badge'
 import type { ErrorRecord, EventType } from '@ultron/types'
-import { Search, AlertCircle, RefreshCw, SlidersHorizontal, X } from 'lucide-react'
+import { Search, AlertCircle, RefreshCw, SlidersHorizontal, X, CheckCircle, ChevronDown } from 'lucide-react'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -67,16 +67,24 @@ function FilterSelect({
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-interface ErrorTableProps {
-  projectId: string
+interface ProjectOption {
+  id: string
+  name: string
 }
 
-export function ErrorTable({ projectId }: ErrorTableProps) {
+interface ErrorTableProps {
+  projectId: string
+  projects?: ProjectOption[]
+}
+
+export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTableProps) {
+  const [activeProjectId, setActiveProjectId] = useState(initialProjectId)
   const [errors, setErrors]         = useState<ErrorRecord[]>([])
   const [total, setTotal]           = useState(0)
   const [page, setPage]             = useState(1)
   const [loading, setLoading]       = useState(true)
   const [showFilters, setShowFilters] = useState(false)
+  const [resolving, setResolving]   = useState<string | null>(null) // tracks error id being resolved
 
   // Committed filter state (triggers fetch)
   const [search, setSearch]         = useState('')
@@ -110,7 +118,7 @@ export function ErrorTable({ projectId }: ErrorTableProps) {
     setLoading(true)
     try {
       const params = new URLSearchParams({
-        project_id: projectId,
+        project_id: activeProjectId,
         page: String(page),
         limit: String(limit),
       })
@@ -134,9 +142,39 @@ export function ErrorTable({ projectId }: ErrorTableProps) {
     } finally {
       setLoading(false)
     }
-  }, [projectId, page, search, eventType, timeRange, browser, os, connection, page_])
+  }, [activeProjectId, page, search, eventType, timeRange, browser, os, connection, page_])
 
   useEffect(() => { fetchErrors() }, [fetchErrors])
+
+  // Reset page when project changes
+  useEffect(() => {
+    setPage(1)
+    clearAllFilters()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProjectId])
+
+  async function handleResolve(error: ErrorRecord) {
+    if (!confirm(`Resolve all "${error.event_type}" errors with this message from this project?\n\nThis will permanently delete all matching errors.`)) return
+    setResolving(error.id)
+    try {
+      const res = await fetch('/api/errors/resolve', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: activeProjectId,
+          message: error.message,
+          event_type: error.event_type,
+        }),
+      })
+      if (!res.ok) throw new Error('Failed to resolve')
+      await fetchErrors()
+    } catch (err) {
+      console.error(err)
+      alert('Failed to resolve errors. Please try again.')
+    } finally {
+      setResolving(null)
+    }
+  }
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault()
@@ -148,8 +186,29 @@ export function ErrorTable({ projectId }: ErrorTableProps) {
   const totalPages = Math.ceil(total / limit)
   const hasAnyFilter = !!(search || eventType || timeRange || browser || os || connection || page_)
 
+  const activeProjectName = projects?.find(p => p.id === activeProjectId)?.name
+
   return (
     <div className="space-y-3">
+
+      {/* ── Project selector (shown when multiple projects are available) ── */}
+      {projects && projects.length > 1 && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Project:</span>
+          <div className="relative">
+            <select
+              value={activeProjectId}
+              onChange={(e) => setActiveProjectId(e.target.value)}
+              className="appearance-none rounded-md border border-input bg-background pl-2.5 pr-7 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+          </div>
+        </div>
+      )}
 
       {/* ── Row 1: event type tabs + time range + filter toggle + refresh ── */}
       <div className="flex flex-wrap items-center gap-2">
@@ -294,8 +353,6 @@ export function ErrorTable({ projectId }: ErrorTableProps) {
               placeholder="Paste session ID..."
               className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               onBlur={(e) => {
-                // session_id filter — added as URL param when we extend the API
-                // For now searches within message as a fallback
                 if (e.target.value) {
                   setSearchInput(e.target.value)
                   setSearch(e.target.value)
@@ -340,16 +397,17 @@ export function ErrorTable({ projectId }: ErrorTableProps) {
               <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Page</th>
               <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell">Browser</th>
               <th className="text-left px-4 py-3 font-medium text-muted-foreground whitespace-nowrap">Time</th>
+              <th className="px-4 py-3 w-10" />
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground text-sm">Loading...</td>
+                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground text-sm">Loading...</td>
               </tr>
             ) : errors.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-12 text-center">
+                <td colSpan={6} className="px-4 py-12 text-center">
                   <div className="flex flex-col items-center gap-2">
                     <AlertCircle className="h-8 w-8 text-muted-foreground/50" />
                     <p className="text-muted-foreground text-sm">
@@ -367,7 +425,7 @@ export function ErrorTable({ projectId }: ErrorTableProps) {
               </tr>
             ) : (
               errors.map((error) => (
-                <tr key={error.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                <tr key={error.id} className="group border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
                   <td className="px-4 py-3">
                     <EventTypeBadge type={error.event_type ?? 'error'} />
                   </td>
@@ -390,6 +448,16 @@ export function ErrorTable({ projectId }: ErrorTableProps) {
                     <span className="text-muted-foreground text-xs whitespace-nowrap">
                       {formatRelativeTime(error.created_at)}
                     </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => handleResolve(error)}
+                      disabled={resolving === error.id}
+                      title="Resolve — deletes all errors of this type from this project"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity rounded p-1 hover:bg-green-500/10 hover:text-green-600 text-muted-foreground disabled:opacity-50"
+                    >
+                      <CheckCircle className="h-4 w-4" />
+                    </button>
                   </td>
                 </tr>
               ))

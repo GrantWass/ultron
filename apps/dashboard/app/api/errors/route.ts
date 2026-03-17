@@ -35,10 +35,13 @@ export async function GET(request: Request) {
 
   const offset = (page - 1) * limit
 
+  const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+
   let query = supabase
     .from('errors')
     .select('*', { count: 'exact' })
     .eq('project_id', projectId)
+    .gte('created_at', monthAgo)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
 

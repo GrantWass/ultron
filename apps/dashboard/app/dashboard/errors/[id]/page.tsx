@@ -3,6 +3,7 @@ import { createServerClient } from '@/lib/supabase/server'
 import { formatDate } from '@/lib/utils'
 import { FixSuggestion } from '@/components/fix-suggestion'
 import { EventTypeBadge, CategoryBadge, VitalRatingBadge } from '@/components/event-badge'
+import { ResolveButton } from '@/components/resolve-button'
 import type { ErrorRecord } from '@ultron/types'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
@@ -240,11 +241,18 @@ export default async function ErrorDetailPage({
 
       {/* Header */}
       <div className="space-y-2">
-        <div className="flex items-start gap-3">
-          <EventTypeBadge type={eventType as any} />
-          <h1 className="font-mono text-lg font-semibold break-all leading-snug">
-            {err.message}
-          </h1>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0">
+            <EventTypeBadge type={eventType as any} />
+            <h1 className="font-mono text-lg font-semibold break-all leading-snug">
+              {err.message}
+            </h1>
+          </div>
+          <ResolveButton
+            projectId={err.project_id}
+            message={err.message}
+            eventType={eventType}
+          />
         </div>
         <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
           {err.browser && <span>Browser: {err.browser}</span>}
