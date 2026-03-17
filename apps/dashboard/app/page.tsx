@@ -64,7 +64,7 @@ export default async function RootPage() {
           <p className="text-lg text-muted-foreground text-center max-w-2xl mx-auto mb-10 leading-relaxed">
             Lightweight error monitoring for single devs and small teams. Catch JS errors,
             slow network requests, and web vitals across all of your projects — then let AI tell you exactly how to fix them.
-            Paste 4 lines and you're live.
+            Paste 3 lines and you're live.
           </p>
 
           {/* CTAs */}

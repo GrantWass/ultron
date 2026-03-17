@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 import type { Project, GithubConnection } from '@ultron/types'
-import { Key, Github, Copy, Check, ExternalLink, Code2 } from 'lucide-react'
+import { Key, Github, Copy, Check, ExternalLink, Code2, Users, Trash2, Mail } from 'lucide-react'
+import type { ProjectMember } from '@ultron/types'
 
 // ── SDK Setup ─────────────────────────────────────────────────────────────────
 
@@ -159,6 +160,12 @@ function SettingsContent() {
   const [repoName, setRepoName] = useState('')
   const [savingRepo, setSavingRepo] = useState(false)
 
+  // Team
+  const [members, setMembers] = useState<ProjectMember[]>([])
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviting, setInviting] = useState(false)
+  const [inviteMsg, setInviteMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+
   useEffect(() => {
     fetch('/api/projects')
       .then((r) => r.json())
@@ -170,6 +177,42 @@ function SettingsContent() {
         setLoading(false)
       })
   }, [])
+
+  useEffect(() => {
+    if (!selectedProjectId) return
+    const selectedProject = projects.find((p) => p.id === selectedProjectId)
+    if (!(selectedProject as any)?.is_owner) return
+    fetch(`/api/projects/${selectedProjectId}/members`)
+      .then((r) => r.ok ? r.json() : [])
+      .then(setMembers)
+  }, [selectedProjectId, projects])
+
+  async function inviteMember(e: React.FormEvent) {
+    e.preventDefault()
+    if (!selectedProjectId || !inviteEmail.trim()) return
+    setInviting(true)
+    setInviteMsg(null)
+    const res = await fetch(`/api/projects/${selectedProjectId}/members`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: inviteEmail.trim() }),
+    })
+    const data = await res.json()
+    if (res.ok) {
+      setMembers((prev) => [data, ...prev])
+      setInviteEmail('')
+      setInviteMsg({ type: 'ok', text: `Invite sent to ${data.invited_email}` })
+    } else {
+      setInviteMsg({ type: 'err', text: data.error ?? 'Failed to send invite' })
+    }
+    setInviting(false)
+  }
+
+  async function removeMember(memberId: string) {
+    if (!selectedProjectId) return
+    await fetch(`/api/projects/${selectedProjectId}/members/${memberId}`, { method: 'DELETE' })
+    setMembers((prev) => prev.filter((m) => m.id !== memberId))
+  }
 
   useEffect(() => {
     if (!selectedProjectId) return
@@ -282,6 +325,73 @@ function SettingsContent() {
 
           {/* SDK Install instructions */}
           <SdkSetup apiKey={selectedProject.api_key} />
+        </div>
+      )}
+
+      {/* Team — owner only */}
+      {(selectedProject as any)?.is_owner && selectedProjectId && (
+        <div className="space-y-3">
+          <h2 className="text-sm font-semibold flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Team
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            Invite collaborators to view this project&apos;s error logs.
+          </p>
+
+          {/* Invite form */}
+          <form onSubmit={inviteMember} className="flex gap-2">
+            <div className="relative flex-1">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <input
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => { setInviteEmail(e.target.value); setInviteMsg(null) }}
+                placeholder="colleague@example.com"
+                className="w-full pl-8 pr-3 py-2 rounded-md border border-input bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={inviting || !inviteEmail.trim()}
+              className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            >
+              {inviting ? 'Sending…' : 'Invite'}
+            </button>
+          </form>
+
+          {inviteMsg && (
+            <p className={`text-xs ${inviteMsg.type === 'ok' ? 'text-green-600' : 'text-destructive'}`}>
+              {inviteMsg.text}
+            </p>
+          )}
+
+          {/* Member list */}
+          {members.length > 0 && (
+            <div className="rounded-md border border-border overflow-hidden">
+              {members.map((member) => (
+                <div key={member.id} className="flex items-center justify-between px-3 py-2.5 border-b border-border last:border-0 text-sm">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="truncate text-sm">{member.invited_email}</span>
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                      member.status === 'accepted'
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400'
+                        : 'bg-muted text-muted-foreground'
+                    }`}>
+                      {member.status === 'accepted' ? 'Accepted' : 'Pending'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => removeMember(member.id)}
+                    className="ml-2 shrink-0 text-muted-foreground hover:text-destructive transition-colors"
+                    title="Remove member"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

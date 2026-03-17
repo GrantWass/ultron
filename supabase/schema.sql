@@ -145,6 +145,81 @@ create trigger on_auth_user_created
   execute procedure handle_new_user();
 
 -- ============================================================
+-- PROJECT MEMBERS (collaborators / invites)
+-- ============================================================
+
+create table if not exists project_members (
+  id            uuid primary key default gen_random_uuid(),
+  project_id    uuid references projects(id) on delete cascade not null,
+  invited_email text not null,
+  user_id       uuid references auth.users(id) on delete set null,
+  role          text not null default 'member',
+  status        text not null default 'pending',   -- 'pending' | 'accepted'
+  token         text not null unique,              -- secure random invite link token
+  invited_at    timestamptz not null default now(),
+  accepted_at   timestamptz,
+  unique(project_id, invited_email)
+);
+
+alter table project_members enable row level security;
+
+-- Owner can do everything with their project's members
+create policy "Project owners can manage members"
+  on project_members for all
+  using (
+    exists (
+      select 1 from projects
+      where projects.id = project_members.project_id
+        and projects.user_id = auth.uid()
+    )
+  );
+
+-- Members can see their own invite rows
+create policy "Members can view own membership"
+  on project_members for select
+  using (
+    auth.uid() = user_id
+    or invited_email = (select email from auth.users where id = auth.uid())
+  );
+
+-- projects: members can read projects they've accepted
+create policy "Members can view shared projects"
+  on projects for select
+  using (
+    exists (
+      select 1 from project_members
+      where project_members.project_id = projects.id
+        and project_members.user_id = auth.uid()
+        and project_members.status = 'accepted'
+    )
+  );
+
+-- errors: accepted members can read
+create policy "Members can view project errors"
+  on errors for select
+  using (
+    exists (
+      select 1 from project_members
+      where project_members.project_id = errors.project_id
+        and project_members.user_id = auth.uid()
+        and project_members.status = 'accepted'
+    )
+  );
+
+-- fix_suggestions: accepted members can read
+create policy "Members can view fix suggestions"
+  on fix_suggestions for select
+  using (
+    exists (
+      select 1 from errors e
+      join project_members pm on pm.project_id = e.project_id
+      where e.id = fix_suggestions.error_id
+        and pm.user_id = auth.uid()
+        and pm.status = 'accepted'
+    )
+  );
+
+-- ============================================================
 -- FUTURE: Usage tracking table (for plan gating — not active)
 -- ============================================================
 -- create table usage (

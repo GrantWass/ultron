@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import type { Project } from '@ultron/types'
-import { AlertCircle, FolderOpen, Settings, LogOut, Zap } from 'lucide-react'
+import { AlertCircle, FolderOpen, Settings, LogOut, Zap, Users } from 'lucide-react'
 
 interface SidebarProps {
   projects: Project[]
@@ -49,7 +49,9 @@ export function Sidebar({ projects, currentProjectId }: SidebarProps) {
                 : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
             )}
           >
-            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+            {(project as any).is_owner === false
+              ? <Users className="h-3.5 w-3.5 shrink-0" />
+              : <AlertCircle className="h-3.5 w-3.5 shrink-0" />}
             <span className="truncate">{project.name}</span>
           </Link>
         ))}

@@ -30,6 +30,18 @@ export interface ErrorRecord {
   created_at: string
 }
 
+export interface ProjectMember {
+  id: string
+  project_id: string
+  invited_email: string
+  user_id: string | null
+  role: 'member'
+  status: 'pending' | 'accepted'
+  token: string
+  invited_at: string
+  accepted_at: string | null
+}
+
 export interface GithubConnection {
   id: string
   project_id: string

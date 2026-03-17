@@ -1,11 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { Suspense } from 'react'
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const next = searchParams.get('next')
   const supabase = createClient()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -26,7 +29,7 @@ export default function LoginPage() {
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
-        router.push('/dashboard')
+        router.push(next ?? '/dashboard')
         router.refresh()
       }
     } catch (err: unknown) {
@@ -104,5 +107,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center" />}>
+      <LoginForm />
+    </Suspense>
   )
 }
