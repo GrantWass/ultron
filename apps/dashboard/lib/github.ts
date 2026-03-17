@@ -51,6 +51,38 @@ export async function exchangeCodeForToken(code: string): Promise<string> {
   return data.access_token
 }
 
+/**
+ * Search a repo for files matching a keyword query, then fetch their contents.
+ * Used as a fallback when no file paths can be parsed from the stack trace.
+ */
+export async function searchAndFetchGitHubFiles(
+  encryptedToken: string,
+  owner: string,
+  repo: string,
+  keywords: string[],
+  maxFiles = 3,
+): Promise<RelevantFile[]> {
+  const token = decrypt(encryptedToken)
+
+  if (keywords.length === 0) return []
+
+  const q = encodeURIComponent(`${keywords.join(' ')} repo:${owner}/${repo}`)
+  const searchRes = await fetch(`${GITHUB_API}/search/code?q=${q}&per_page=${maxFiles}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github.v3+json',
+    },
+  })
+
+  if (!searchRes.ok) return []
+
+  const { items } = await searchRes.json() as { items: { path: string }[] }
+  if (!items?.length) return []
+
+  const paths = items.slice(0, maxFiles).map((item) => item.path)
+  return fetchGitHubFiles(encryptedToken, owner, repo, paths)
+}
+
 export async function fetchGitHubFiles(
   encryptedToken: string,
   owner: string,

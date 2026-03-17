@@ -1,8 +1,8 @@
 import { streamText } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createServerClient, createServiceRoleClient } from '@/lib/supabase/server'
-import { parseStackTrace } from '@/lib/stack-parser'
-import { fetchGitHubFiles } from '@/lib/github'
+import { parseStackTrace, extractSearchKeywords } from '@/lib/stack-parser'
+import { fetchGitHubFiles, searchAndFetchGitHubFiles } from '@/lib/github'
 import type { ErrorRecord, RelevantFile } from '@ultron/types'
 
 export const dynamic = 'force-dynamic'
@@ -41,7 +41,7 @@ Based on the error and available context, provide:
 2. **Fix** — Provide the specific code change needed as a unified diff
 3. **Edge Cases** — Any related issues or edge cases to watch for
 
-If no source files are available, infer the fix from the error message and stack trace alone.
+If no source files are available or they do not give insightful information, infer the fix from the error message and stack trace alone.
 Respond in a clear and concise manner, focusing on actionable insights for the developer.`
 }
 
@@ -176,7 +176,26 @@ export async function POST(request: Request) {
       }
     } else {
       // TODO: delete
-      console.log('[fix] No file paths parsed from stack trace — skipping GitHub fetch')
+      console.log('[fix] No file paths from stack trace — falling back to keyword search')
+      try {
+        const keywords = extractSearchKeywords(error.message ?? '', error.stack_trace ?? '')
+        // TODO: delete
+        console.log('[fix] Keyword search terms:', keywords)
+        files = await searchAndFetchGitHubFiles(
+          githubConn.access_token,
+          githubConn.repo_owner,
+          githubConn.repo_name,
+          keywords,
+        )
+        // TODO: delete
+        console.log('[fix] Files from keyword search:', files.map((f) => ({
+          path: f.path,
+          chars: f.content.length,
+          preview: f.content.slice(0, 300),
+        })))
+      } catch (err) {
+        console.error('Failed to search GitHub files:', err)
+      }
     }
   } else {
     // TODO: delete

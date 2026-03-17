@@ -48,6 +48,49 @@ export function parseStackTrace(stackTrace: string): string[] {
 }
 
 /**
+ * Extract meaningful search keywords from an error message + stack trace.
+ * Prioritises: property names in quotes, PascalCase identifiers (component/class names),
+ * and function names from the top stack frames.
+ * Returns at most 5 unique tokens, best for a GitHub code search query.
+ */
+export function extractSearchKeywords(message: string, stackTrace: string): string[] {
+  const keywords = new Set<string>()
+
+  // 1. Property name from JS runtime errors: (reading 'propName') or ['propName']
+  const readingMatch = message.match(/\breading\s+['"]([a-zA-Z_$][a-zA-Z0-9_$]{2,})['"]/i)
+  if (readingMatch) keywords.add(readingMatch[1])
+
+  const bracketMatch = message.match(/\[['"]([a-zA-Z_$][a-zA-Z0-9_$]{2,})['"]\]/)
+  if (bracketMatch) keywords.add(bracketMatch[1])
+
+  // 2. PascalCase words in the message — likely component/class names
+  const pascalWords = message.match(/\b[A-Z][a-zA-Z0-9]{2,}\b/g) ?? []
+  for (const w of pascalWords) {
+    if (!['Error', 'TypeError', 'Cannot', 'ReferenceError', 'SyntaxError', 'RangeError'].includes(w)) {
+      keywords.add(w)
+    }
+  }
+
+  // 3. Function/component names from top stack frames (survive even in some minified builds)
+  const stackLines = stackTrace.split('\n').slice(0, 15)
+  for (const line of stackLines) {
+    if (keywords.size >= 5) break
+
+    // "at PascalCaseName" or "at PascalCaseName.method"
+    const pascalFn = line.match(/at\s+([A-Z][a-zA-Z0-9]{2,})(?:\.|[\s(])/)
+    if (pascalFn) { keywords.add(pascalFn[1]); continue }
+
+    // "at object.methodName" — camelCase methods, only if decently long
+    const camelFn = line.match(/at\s+(?:\w+\.)+([a-zA-Z_$][a-zA-Z0-9_$]{4,})\s/)
+    if (camelFn && camelFn[1] !== 'anonymous' && camelFn[1] !== 'default') {
+      keywords.add(camelFn[1])
+    }
+  }
+
+  return Array.from(keywords).slice(0, 5)
+}
+
+/**
  * Parse line numbers alongside file paths for richer context.
  */
 export interface StackFrame {
