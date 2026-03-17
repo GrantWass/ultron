@@ -139,7 +139,8 @@ export async function POST(request: Request) {
 
   // Fetch GitHub files if connection exists
   let files: RelevantFile[] = []
-  const githubConn = (error as any).projects?.github_connections?.[0]
+  const rawConn = (error as any).projects?.github_connections
+  const githubConn = Array.isArray(rawConn) ? rawConn[0] : rawConn
 
   // TODO: delete
   console.log('[fix] Raw projects data:', JSON.stringify((error as any).projects, null, 2))

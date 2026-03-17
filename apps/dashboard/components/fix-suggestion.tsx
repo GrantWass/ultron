@@ -33,8 +33,11 @@ export function FixSuggestion({ errorId, existingSuggestion, githubRepo }: FixSu
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Github className="h-3.5 w-3.5 shrink-0" />
           <span>Using source files from <span className="font-medium text-foreground">{githubRepo}</span></span>
-          <span title="The AI will fetch relevant source files from this repo based on the stack trace to give more accurate fix suggestions." className="cursor-help">
+          <span className="relative group cursor-help">
             <Info className="h-3.5 w-3.5" />
+            <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 w-64 rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50">
+              Relevant source files will be fetched from this repo based on the stack trace, giving the AI more accurate context to suggest a fix.
+            </span>
           </span>
         </div>
       ) : (
