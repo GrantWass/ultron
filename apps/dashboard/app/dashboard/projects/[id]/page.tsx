@@ -22,7 +22,7 @@ export default async function ProjectErrorsPage({
 
   const allProjects = [
     ...(ownedProjects ?? []),
-    ...(memberRows ?? []).map((r) => r.projects as { id: string; name: string }).filter(Boolean),
+    ...(memberRows ?? []).map((r) => r.projects as unknown as { id: string; name: string }).filter(Boolean),
   ]
 
   if (!project) notFound()
