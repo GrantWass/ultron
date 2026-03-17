@@ -19,6 +19,9 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.45.0
         version: 2.99.1
+      '@ultron-dev/tracker':
+        specifier: workspace:*
+        version: link:../npm-package
       '@ultron/types':
         specifier: workspace:*
         version: link:../../packages/shared-types
