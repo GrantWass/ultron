@@ -13,10 +13,17 @@ export default async function ProjectErrorsPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [{ data: project }, { data: allProjects }] = await Promise.all([
-    supabase.from('projects').select('*').eq('id', id).eq('user_id', user.id).single(),
+  const [{ data: project }, { data: ownedProjects }, { data: memberRows }] = await Promise.all([
+    // RLS allows both owners and accepted members to select
+    supabase.from('projects').select('*').eq('id', id).single(),
     supabase.from('projects').select('id, name').eq('user_id', user.id).order('created_at', { ascending: false }),
+    supabase.from('project_members').select('projects(id, name)').eq('user_id', user.id).eq('status', 'accepted'),
   ])
+
+  const allProjects = [
+    ...(ownedProjects ?? []),
+    ...(memberRows ?? []).map((r) => r.projects as { id: string; name: string }).filter(Boolean),
+  ]
 
   if (!project) notFound()
 

@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { createServerClient } from '@/lib/supabase/server'
+import { createServerClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { Sidebar } from '@/components/sidebar'
 import type { Project } from '@ultron/types'
 
@@ -11,6 +11,8 @@ export default async function DashboardLayout({
   const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  const serviceClient = await createServiceRoleClient()
 
   const [
     { data: ownedProjects },
@@ -27,7 +29,8 @@ export default async function DashboardLayout({
       .select('projects(*)')
       .eq('user_id', user.id)
       .eq('status', 'accepted'),
-    supabase
+    // Service role bypasses RLS so the projects join resolves even for pending invites
+    serviceClient
       .from('project_members')
       .select('token, project_id, projects(name)')
       .eq('invited_email', user.email!)
