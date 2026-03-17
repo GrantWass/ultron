@@ -1,5 +1,5 @@
 import { notFound, redirect } from 'next/navigation'
-import { createServerClient } from '@/lib/supabase/server'
+import { createServerClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { formatDate } from '@/lib/utils'
 import { FixSuggestion } from '@/components/fix-suggestion'
 import { EventTypeBadge, CategoryBadge, VitalRatingBadge } from '@/components/event-badge'
@@ -207,14 +207,26 @@ export default async function ErrorDetailPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: error } = await supabase
+  // Verify access: owner OR accepted member
+  const [{ data: memberRow }] = await Promise.all([
+    supabase.from('project_members').select('project_id').eq('user_id', user.id).eq('status', 'accepted'),
+  ])
+  const memberProjectIds = (memberRow ?? []).map((r) => r.project_id as string)
+
+  // Fetch error via service role, then verify caller has access
+  const serviceClient = createServiceRoleClient()
+  const { data: error } = await serviceClient
     .from('errors')
     .select(`*, projects!inner(id, user_id, name)`)
     .eq('id', id)
-    .eq('projects.user_id', user.id)
     .single()
 
   if (!error) notFound()
+
+  const projectId = (error as any).project_id as string
+  const isOwner = (error as any).projects?.user_id === user.id
+  const isMember = memberProjectIds.includes(projectId)
+  if (!isOwner && !isMember) notFound()
 
   const err = error as ErrorRecord & { projects: { id: string; name: string } }
   const meta = (err.metadata ?? {}) as Record<string, unknown>

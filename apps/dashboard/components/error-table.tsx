@@ -1,11 +1,14 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { formatRelativeTime, truncate } from '@/lib/utils'
 import { EventTypeBadge } from '@/components/event-badge'
 import type { ErrorRecord, EventType } from '@ultron/types'
-import { Search, AlertCircle, RefreshCw, SlidersHorizontal, X, CheckCircle, ChevronDown } from 'lucide-react'
+import {
+  Search, AlertCircle, RefreshCw, X, CheckCircle,
+  ChevronDown, Clock, Globe, Wifi, Monitor, Trash2,
+} from 'lucide-react'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -18,11 +21,11 @@ const EVENT_TYPES: { value: EventType | ''; label: string }[] = [
 ]
 
 const TIME_RANGES = [
-  { value: '',    label: 'All time' },
+  { value: '',    label: 'Any time' },
   { value: '5m',  label: 'Last 5 min' },
   { value: '15m', label: 'Last 15 min' },
   { value: '30m', label: 'Last 30 min' },
-  { value: '1h',  label: 'Last 1 hour' },
+  { value: '1h',  label: 'Last hour' },
   { value: '6h',  label: 'Last 6 hours' },
   { value: '24h', label: 'Last 24 hours' },
   { value: '7d',  label: 'Last 7 days' },
@@ -43,34 +46,140 @@ function timeRangeToFrom(range: string): string | null {
   return new Date(Date.now() - mins[range] * 60 * 1000).toISOString()
 }
 
-// ── Select helper ─────────────────────────────────────────────────────────────
+// ── Resolve modal ─────────────────────────────────────────────────────────────
 
-function FilterSelect({
-  value, onChange, placeholder, options,
+interface ResolveModalProps {
+  error: ErrorRecord
+  onConfirm: () => Promise<void>
+  onCancel: () => void
+  resolving: boolean
+}
+
+function ResolveModal({ error, onConfirm, onCancel, resolving }: ResolveModalProps) {
+  // Close on Escape
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onCancel() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onCancel])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      onClick={(e) => { if (e.target === e.currentTarget) onCancel() }}
+    >
+      <div className="w-full max-w-md rounded-xl border border-border bg-card shadow-xl">
+        {/* Header */}
+        <div className="flex items-start justify-between p-5 pb-4 border-b border-border">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-destructive/10">
+              <Trash2 className="h-4 w-4 text-destructive" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold">Resolve error</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">This action cannot be undone</p>
+            </div>
+          </div>
+          <button
+            onClick={onCancel}
+            className="rounded-md p-1 hover:bg-accent transition-colors text-muted-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-5 space-y-4">
+          <p className="text-sm text-muted-foreground">
+            All <span className="font-medium text-foreground">{error.event_type}</span> errors with this exact message will be permanently deleted from this project:
+          </p>
+          <div className="rounded-md border border-border bg-muted/40 px-3 py-2.5">
+            <p className="font-mono text-xs text-foreground/80 break-all leading-relaxed">
+              {error.message}
+            </p>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Other error types or messages are not affected.
+          </p>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border">
+          <button
+            onClick={onCancel}
+            disabled={resolving}
+            className="rounded-md border border-input px-4 py-2 text-sm hover:bg-accent transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={resolving}
+            className="inline-flex items-center gap-2 rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50"
+          >
+            {resolving ? (
+              <>
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                Resolving…
+              </>
+            ) : (
+              <>
+                <CheckCircle className="h-3.5 w-3.5" />
+                Resolve
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Dropdown filter ───────────────────────────────────────────────────────────
+
+function FilterDropdown({
+  label, icon: Icon, value, onChange, options, placeholder,
 }: {
+  label: string
+  icon: React.ElementType
   value: string
   onChange: (v: string) => void
-  placeholder: string
   options: string[]
+  placeholder: string
 }) {
+  const active = !!value
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={`rounded-md border border-input bg-background px-2.5 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors ${value ? 'border-primary/50 text-foreground' : 'text-muted-foreground'}`}
-    >
-      <option value="">{placeholder}</option>
-      {options.map((o) => <option key={o} value={o}>{o}</option>)}
-    </select>
+    <div className="relative">
+      <Icon className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`h-8 appearance-none rounded-md border pl-8 pr-6 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
+          ${active
+            ? 'border-primary/50 bg-primary/5 text-primary font-medium'
+            : 'border-input bg-background text-muted-foreground hover:text-foreground'
+          }`}
+      >
+        <option value="">{placeholder}</option>
+        {options.map((o) => <option key={o} value={o}>{o}</option>)}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+      {active && (
+        <button
+          onClick={() => onChange('')}
+          className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-destructive transition-colors"
+          title={`Clear ${label}`}
+        >
+          <X className="h-2 w-2" />
+        </button>
+      )}
+    </div>
   )
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-interface ProjectOption {
-  id: string
-  name: string
-}
+interface ProjectOption { id: string; name: string }
 
 interface ErrorTableProps {
   projectId: string
@@ -79,56 +188,43 @@ interface ErrorTableProps {
 
 export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTableProps) {
   const [activeProjectId, setActiveProjectId] = useState(initialProjectId)
-  const [errors, setErrors]         = useState<ErrorRecord[]>([])
-  const [total, setTotal]           = useState(0)
-  const [page, setPage]             = useState(1)
-  const [loading, setLoading]       = useState(true)
-  const [showFilters, setShowFilters] = useState(false)
-  const [resolving, setResolving]   = useState<string | null>(null) // tracks error id being resolved
+  const [errors, setErrors]     = useState<ErrorRecord[]>([])
+  const [total, setTotal]       = useState(0)
+  const [page, setPage]         = useState(1)
+  const [loading, setLoading]   = useState(true)
+  const [resolveTarget, setResolveTarget] = useState<ErrorRecord | null>(null)
+  const [resolving, setResolving]         = useState(false)
 
-  // Committed filter state (triggers fetch)
+  // Filter state
   const [search, setSearch]         = useState('')
   const [eventType, setEventType]   = useState<EventType | ''>('')
   const [timeRange, setTimeRange]   = useState('')
   const [browser, setBrowser]       = useState('')
   const [os, setOs]                 = useState('')
   const [connection, setConnection] = useState('')
-  const [page_, setPage_]           = useState('') // URL/page path filter
-
-  // Pending input state
-  const [searchInput, setSearchInput]   = useState('')
-  const [pageInput, setPageInput]       = useState('')
+  const [page_, setPage_]           = useState('')
+  const [searchInput, setSearchInput] = useState('')
 
   const limit = 50
-
-  const activeFilterCount = [timeRange, browser, os, connection, page_].filter(Boolean).length
+  const searchRef = useRef<HTMLInputElement>(null)
 
   function clearAllFilters() {
     setSearch(''); setSearchInput('')
-    setEventType('')
-    setTimeRange('')
-    setBrowser('')
-    setOs('')
-    setConnection('')
-    setPage_(''); setPageInput('')
-    setPage(1)
+    setEventType(''); setTimeRange('')
+    setBrowser(''); setOs(''); setConnection('')
+    setPage_(''); setPage(1)
   }
 
   const fetchErrors = useCallback(async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams({
-        project_id: activeProjectId,
-        page: String(page),
-        limit: String(limit),
-      })
+      const params = new URLSearchParams({ project_id: activeProjectId, page: String(page), limit: String(limit) })
       if (search)     params.set('search', search)
       if (eventType)  params.set('event_type', eventType)
       if (browser)    params.set('browser', browser)
       if (os)         params.set('os', os)
       if (connection) params.set('connection', connection)
       if (page_)      params.set('url', page_)
-
       const from = timeRangeToFrom(timeRange)
       if (from) params.set('from', from)
 
@@ -146,80 +242,73 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
 
   useEffect(() => { fetchErrors() }, [fetchErrors])
 
-  // Reset page when project changes
   useEffect(() => {
-    setPage(1)
-    clearAllFilters()
+    setPage(1); clearAllFilters()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProjectId])
 
-  async function handleResolve(error: ErrorRecord) {
-    if (!confirm(`Resolve all "${error.event_type}" errors with this message from this project?\n\nThis will permanently delete all matching errors.`)) return
-    setResolving(error.id)
+  async function confirmResolve() {
+    if (!resolveTarget) return
+    setResolving(true)
     try {
       const res = await fetch('/api/errors/resolve', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           project_id: activeProjectId,
-          message: error.message,
-          event_type: error.event_type,
+          message: resolveTarget.message,
+          event_type: resolveTarget.event_type,
         }),
       })
       if (!res.ok) throw new Error('Failed to resolve')
+      setResolveTarget(null)
       await fetchErrors()
     } catch (err) {
       console.error(err)
-      alert('Failed to resolve errors. Please try again.')
     } finally {
-      setResolving(null)
+      setResolving(false)
     }
   }
 
-  function handleSearch(e: React.FormEvent) {
+  function submitSearch(e: React.FormEvent) {
     e.preventDefault()
     setSearch(searchInput)
-    setPage_(pageInput)
     setPage(1)
   }
 
-  const totalPages = Math.ceil(total / limit)
+  const totalPages   = Math.ceil(total / limit)
   const hasAnyFilter = !!(search || eventType || timeRange || browser || os || connection || page_)
-
-  const activeProjectName = projects?.find(p => p.id === activeProjectId)?.name
 
   return (
     <div className="space-y-3">
 
-      {/* ── Project selector (shown when multiple projects are available) ── */}
+      {/* ── Project selector ──────────────────────────────────────────────── */}
       {projects && projects.length > 1 && (
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">Project:</span>
+          <span className="text-xs text-muted-foreground shrink-0">Project</span>
           <div className="relative">
             <select
               value={activeProjectId}
               onChange={(e) => setActiveProjectId(e.target.value)}
               className="appearance-none rounded-md border border-input bg-background pl-2.5 pr-7 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
+              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
             <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
           </div>
         </div>
       )}
 
-      {/* ── Row 1: event type tabs + time range + filter toggle + refresh ── */}
+      {/* ── Toolbar ───────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-2">
 
-        {/* Event type tabs */}
-        <div className="flex gap-1 rounded-md border border-border p-1 bg-muted/30">
+        {/* Event type pills */}
+        <div className="flex gap-0.5 rounded-lg border border-border bg-muted/40 p-0.5">
           {EVENT_TYPES.map(({ value, label }) => (
             <button
               key={value}
               onClick={() => { setEventType(value); setPage(1) }}
-              className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-all ${
                 eventType === value
                   ? 'bg-background shadow-sm text-foreground'
                   : 'text-muted-foreground hover:text-foreground'
@@ -230,156 +319,140 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
           ))}
         </div>
 
+        <div className="w-px h-5 bg-border" />
+
         {/* Time range */}
-        <select
+        <FilterDropdown
+          label="Time"
+          icon={Clock}
           value={timeRange}
-          onChange={(e) => { setTimeRange(e.target.value); setPage(1) }}
-          className={`rounded-md border border-input bg-background px-2.5 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${timeRange ? 'border-primary/50 text-foreground font-medium' : 'text-muted-foreground'}`}
-        >
-          {TIME_RANGES.map(({ value, label }) => (
-            <option key={value} value={value}>{label}</option>
-          ))}
-        </select>
+          onChange={(v) => { setTimeRange(v); setPage(1) }}
+          placeholder="Any time"
+          options={TIME_RANGES.slice(1).map((t) => t.label)}
+        />
 
-        {/* Filter toggle */}
-        <button
-          onClick={() => setShowFilters((v) => !v)}
-          className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors ${
-            showFilters || activeFilterCount > 0
-              ? 'border-primary/50 bg-primary/5 text-primary'
-              : 'border-input text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <SlidersHorizontal className="h-3.5 w-3.5" />
-          Filters
-          {activeFilterCount > 0 && (
-            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-              {activeFilterCount}
-            </span>
+        {/* Browser */}
+        <FilterDropdown
+          label="Browser"
+          icon={Monitor}
+          value={browser}
+          onChange={(v) => { setBrowser(v); setPage(1) }}
+          placeholder="Browser"
+          options={BROWSERS}
+        />
+
+        {/* OS */}
+        <FilterDropdown
+          label="OS"
+          icon={Monitor}
+          value={os}
+          onChange={(v) => { setOs(v); setPage(1) }}
+          placeholder="OS"
+          options={OPERATING_SYSTEMS}
+        />
+
+        {/* Connection */}
+        <FilterDropdown
+          label="Connection"
+          icon={Wifi}
+          value={connection}
+          onChange={(v) => { setConnection(v); setPage(1) }}
+          placeholder="Connection"
+          options={CONNECTIONS}
+        />
+
+        <div className="ml-auto flex items-center gap-2">
+          {hasAnyFilter && (
+            <button
+              onClick={clearAllFilters}
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors"
+            >
+              <X className="h-3 w-3" />
+              Clear
+            </button>
           )}
-        </button>
-
-        {/* Refresh */}
-        <button
-          onClick={fetchErrors}
-          className="rounded-md border border-input p-1.5 hover:bg-accent transition-colors"
-          title="Refresh"
-        >
-          <RefreshCw className="h-3.5 w-3.5 text-muted-foreground" />
-        </button>
-
-        {/* Clear all */}
-        {hasAnyFilter && (
           <button
-            onClick={clearAllFilters}
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors ml-auto"
+            onClick={fetchErrors}
+            className="rounded-md border border-input p-1.5 hover:bg-accent transition-colors"
+            title="Refresh"
           >
-            <X className="h-3 w-3" />
-            Clear all
+            <RefreshCw className={`h-3.5 w-3.5 text-muted-foreground ${loading ? 'animate-spin' : ''}`} />
           </button>
-        )}
+        </div>
       </div>
 
-      {/* ── Row 2: search + page filter ─────────────────────────────────── */}
-      <form onSubmit={handleSearch} className="flex gap-2">
+      {/* ── Search row ────────────────────────────────────────────────────── */}
+      <form onSubmit={submitSearch} className="flex gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <input
+            ref={searchRef}
             type="text"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search error messages..."
-            className="w-full pl-8 pr-3 py-1.5 rounded-md border border-input bg-background text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            placeholder="Search messages…"
+            className="h-8 w-full pl-8 pr-3 rounded-md border border-input bg-background text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
+          {searchInput && (
+            <button
+              type="button"
+              onClick={() => { setSearchInput(''); setSearch(''); setPage(1) }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
-        <input
-          type="text"
-          value={pageInput}
-          onChange={(e) => setPageInput(e.target.value)}
-          placeholder="Filter by page path..."
-          className="w-48 px-3 py-1.5 rounded-md border border-input bg-background text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        />
-        <button
-          type="submit"
-          className="rounded-md border border-input px-3 py-1.5 text-xs hover:bg-accent transition-colors"
-        >
-          Search
-        </button>
-        {(search || searchInput || page_ || pageInput) && (
+        <div className="relative">
+          <Globe className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <input
+            type="text"
+            value={page_}
+            onChange={(e) => { setPage_(e.target.value); setPage(1) }}
+            placeholder="Page path…"
+            className={`h-8 w-40 pl-8 pr-3 rounded-md border text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors
+              ${page_ ? 'border-primary/50 bg-primary/5' : 'border-input bg-background'}`}
+          />
+          {page_ && (
+            <button
+              type="button"
+              onClick={() => { setPage_(''); setPage(1) }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+        {searchInput !== search && (
           <button
-            type="button"
-            onClick={() => { setSearchInput(''); setSearch(''); setPageInput(''); setPage_(''); setPage(1) }}
-            className="rounded-md border border-input px-3 py-1.5 text-xs hover:bg-accent transition-colors"
+            type="submit"
+            className="h-8 rounded-md border border-input px-3 text-xs hover:bg-accent transition-colors whitespace-nowrap"
           >
-            Clear
+            Search
           </button>
         )}
       </form>
 
-      {/* ── Filter panel ─────────────────────────────────────────────────── */}
-      {showFilters && (
-        <div className="rounded-md border border-border bg-muted/20 p-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          <div className="space-y-1">
-            <label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Browser</label>
-            <FilterSelect
-              value={browser}
-              onChange={(v) => { setBrowser(v); setPage(1) }}
-              placeholder="Any browser"
-              options={BROWSERS}
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">OS</label>
-            <FilterSelect
-              value={os}
-              onChange={(v) => { setOs(v); setPage(1) }}
-              placeholder="Any OS"
-              options={OPERATING_SYSTEMS}
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Connection</label>
-            <FilterSelect
-              value={connection}
-              onChange={(v) => { setConnection(v); setPage(1) }}
-              placeholder="Any connection"
-              options={CONNECTIONS}
-            />
-          </div>
-          <div className="space-y-1 sm:col-span-1">
-            <label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Session ID</label>
-            <input
-              type="text"
-              placeholder="Paste session ID..."
-              className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              onBlur={(e) => {
-                if (e.target.value) {
-                  setSearchInput(e.target.value)
-                  setSearch(e.target.value)
-                  setPage(1)
-                }
-              }}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Active filter chips */}
-      {(browser || os || connection || page_ || timeRange) && (
+      {/* ── Active filter chips ───────────────────────────────────────────── */}
+      {(search || browser || os || connection || page_ || timeRange) && (
         <div className="flex flex-wrap gap-1.5">
           {[
-            browser    && { label: `Browser: ${browser}`,    clear: () => { setBrowser('');    setPage(1) } },
-            os         && { label: `OS: ${os}`,              clear: () => { setOs('');         setPage(1) } },
-            connection && { label: `Connection: ${connection}`, clear: () => { setConnection(''); setPage(1) } },
-            page_      && { label: `Page: ${page_}`,         clear: () => { setPage_(''); setPageInput(''); setPage(1) } },
-            timeRange  && { label: TIME_RANGES.find(t => t.value === timeRange)?.label, clear: () => { setTimeRange(''); setPage(1) } },
+            search     && { label: `"${truncate(search, 30)}"`,   clear: () => { setSearch(''); setSearchInput(''); setPage(1) } },
+            timeRange  && { label: TIME_RANGES.find(t => t.label === timeRange || t.value === timeRange)?.label ?? timeRange, clear: () => { setTimeRange(''); setPage(1) } },
+            browser    && { label: browser,                        clear: () => { setBrowser('');    setPage(1) } },
+            os         && { label: os,                             clear: () => { setOs('');         setPage(1) } },
+            connection && { label: connection,                     clear: () => { setConnection(''); setPage(1) } },
+            page_      && { label: `path: ${page_}`,              clear: () => { setPage_('');      setPage(1) } },
           ].filter(Boolean).map((chip: any) => (
             <span
               key={chip.label}
-              className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 px-2 py-0.5 text-[11px] text-primary"
+              className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/60 px-2.5 py-1 text-[11px] text-foreground/70"
             >
               {chip.label}
-              <button onClick={chip.clear} className="hover:text-destructive transition-colors">
+              <button
+                onClick={chip.clear}
+                className="ml-0.5 rounded-full hover:text-destructive transition-colors"
+              >
                 <X className="h-2.5 w-2.5" />
               </button>
             </span>
@@ -387,76 +460,77 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
         </div>
       )}
 
-      {/* ── Table ────────────────────────────────────────────────────────── */}
-      <div className="rounded-md border border-border overflow-hidden">
+      {/* ── Table ─────────────────────────────────────────────────────────── */}
+      <div className="rounded-lg border border-border overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-border bg-muted/50">
-              <th className="text-left px-4 py-3 font-medium text-muted-foreground w-20">Type</th>
-              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Message</th>
-              <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden md:table-cell">Page</th>
-              <th className="text-left px-4 py-3 font-medium text-muted-foreground hidden lg:table-cell">Browser</th>
-              <th className="text-left px-4 py-3 font-medium text-muted-foreground whitespace-nowrap">Time</th>
-              <th className="px-4 py-3 w-10" />
+            <tr className="border-b border-border bg-muted/40">
+              <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground w-24">Type</th>
+              <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Message</th>
+              <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground hidden md:table-cell">Page</th>
+              <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground hidden lg:table-cell">Browser</th>
+              <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">When</th>
+              <th className="w-10" />
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-border/60">
             {loading ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground text-sm">Loading...</td>
+                <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground text-sm">
+                  <RefreshCw className="h-4 w-4 animate-spin mx-auto mb-2 text-muted-foreground/50" />
+                  Loading…
+                </td>
               </tr>
             ) : errors.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-12 text-center">
-                  <div className="flex flex-col items-center gap-2">
-                    <AlertCircle className="h-8 w-8 text-muted-foreground/50" />
-                    <p className="text-muted-foreground text-sm">
-                      {hasAnyFilter ? 'No events match your filters' : 'No events yet'}
-                    </p>
-                    {hasAnyFilter ? (
-                      <button onClick={clearAllFilters} className="text-xs text-primary hover:underline">
-                        Clear filters
-                      </button>
-                    ) : (
-                      <p className="text-xs text-muted-foreground/70">Install the SDK and events will appear here</p>
-                    )}
-                  </div>
+                <td colSpan={6} className="px-4 py-14 text-center">
+                  <AlertCircle className="h-7 w-7 text-muted-foreground/30 mx-auto mb-2" />
+                  <p className="text-muted-foreground text-sm mb-1">
+                    {hasAnyFilter ? 'No events match your filters' : 'No events yet'}
+                  </p>
+                  {hasAnyFilter ? (
+                    <button onClick={clearAllFilters} className="text-xs text-primary hover:underline">
+                      Clear all filters
+                    </button>
+                  ) : (
+                    <p className="text-xs text-muted-foreground/50">Install the SDK and events will appear here</p>
+                  )}
                 </td>
               </tr>
             ) : (
               errors.map((error) => (
-                <tr key={error.id} className="group border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                <tr
+                  key={error.id}
+                  className="group hover:bg-muted/20 transition-colors"
+                >
                   <td className="px-4 py-3">
                     <EventTypeBadge type={error.event_type ?? 'error'} />
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 max-w-0">
                     <Link href={`/dashboard/errors/${error.id}`} className="block hover:text-primary transition-colors">
-                      <span className="font-mono text-xs text-foreground/80">
-                        {truncate(error.message, 90)}
+                      <span className="font-mono text-xs text-foreground/80 line-clamp-2">
+                        {error.message}
                       </span>
                     </Link>
                   </td>
                   <td className="px-4 py-3 hidden md:table-cell">
-                    <span className="text-muted-foreground text-xs">
-                      {error.url ? truncate(new URL(error.url).pathname, 40) : '—'}
+                    <span className="text-muted-foreground text-xs font-mono">
+                      {error.url ? truncate(new URL(error.url).pathname, 36) : '—'}
                     </span>
                   </td>
                   <td className="px-4 py-3 hidden lg:table-cell">
                     <span className="text-muted-foreground text-xs">{error.browser ?? '—'}</span>
                   </td>
-                  <td className="px-4 py-3">
-                    <span className="text-muted-foreground text-xs whitespace-nowrap">
-                      {formatRelativeTime(error.created_at)}
-                    </span>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <span className="text-muted-foreground text-xs">{formatRelativeTime(error.created_at)}</span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3">
                     <button
-                      onClick={() => handleResolve(error)}
-                      disabled={resolving === error.id}
-                      title="Resolve — deletes all errors of this type from this project"
-                      className="opacity-0 group-hover:opacity-100 transition-opacity rounded p-1 hover:bg-green-500/10 hover:text-green-600 text-muted-foreground disabled:opacity-50"
+                      onClick={() => setResolveTarget(error)}
+                      title="Resolve — delete all errors with this message"
+                      className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                     >
-                      <CheckCircle className="h-4 w-4" />
+                      <CheckCircle className="h-3.5 w-3.5" />
                     </button>
                   </td>
                 </tr>
@@ -466,29 +540,42 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
         </table>
       </div>
 
-      {/* ── Pagination ───────────────────────────────────────────────────── */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground text-xs">
-            {total} result{total !== 1 ? 's' : ''} · page {page} of {totalPages}
+      {/* ── Pagination ────────────────────────────────────────────────────── */}
+      {(totalPages > 1 || total > 0) && (
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">
+            {total.toLocaleString()} event{total !== 1 ? 's' : ''}
+            {totalPages > 1 && ` · page ${page} of ${totalPages}`}
           </span>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="rounded-md border border-input px-3 py-1.5 text-xs disabled:opacity-50 hover:bg-accent transition-colors"
-            >
-              Previous
-            </button>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-              className="rounded-md border border-input px-3 py-1.5 text-xs disabled:opacity-50 hover:bg-accent transition-colors"
-            >
-              Next
-            </button>
-          </div>
+          {totalPages > 1 && (
+            <div className="flex gap-1.5">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="rounded-md border border-input px-3 py-1.5 text-xs disabled:opacity-40 hover:bg-accent transition-colors"
+              >
+                ← Previous
+              </button>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="rounded-md border border-input px-3 py-1.5 text-xs disabled:opacity-40 hover:bg-accent transition-colors"
+              >
+                Next →
+              </button>
+            </div>
+          )}
         </div>
+      )}
+
+      {/* ── Resolve modal ─────────────────────────────────────────────────── */}
+      {resolveTarget && (
+        <ResolveModal
+          error={resolveTarget}
+          onConfirm={confirmResolve}
+          onCancel={() => { if (!resolving) setResolveTarget(null) }}
+          resolving={resolving}
+        />
       )}
     </div>
   )
