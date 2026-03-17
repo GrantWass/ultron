@@ -21,15 +21,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'project_id is required' }, { status: 400 })
   }
 
-  // Verify project ownership
-  const { data: project } = await supabase
-    .from('projects')
-    .select('id')
-    .eq('id', projectId)
-    .eq('user_id', user.id)
-    .single()
+  // Verify access: owner OR accepted member
+  const [{ data: ownedProject }, { data: memberRow }] = await Promise.all([
+    supabase.from('projects').select('id').eq('id', projectId).eq('user_id', user.id).maybeSingle(),
+    supabase.from('project_members').select('id').eq('project_id', projectId).eq('user_id', user.id).eq('status', 'accepted').maybeSingle(),
+  ])
 
-  if (!project) {
+  if (!ownedProject && !memberRow) {
     return NextResponse.json({ error: 'Project not found' }, { status: 404 })
   }
 

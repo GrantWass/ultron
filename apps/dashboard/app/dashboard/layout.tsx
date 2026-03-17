@@ -17,7 +17,7 @@ export default async function DashboardLayout({
   const [
     { data: ownedProjects },
     { data: memberRows },
-    { data: pendingInvites },
+    { data: pendingInviteRows },
   ] = await Promise.all([
     supabase
       .from('projects')
@@ -26,30 +26,43 @@ export default async function DashboardLayout({
       .order('created_at', { ascending: false }),
     supabase
       .from('project_members')
-      .select('projects(*)')
+      .select('project_id')
       .eq('user_id', user.id)
       .eq('status', 'accepted'),
-    // Service role bypasses RLS so the projects join resolves even for pending invites
-    serviceClient
+    // RLS allows invited_email = auth.email() so regular client works here
+    supabase
       .from('project_members')
-      .select('token, project_id, projects(name)')
+      .select('token, project_id')
       .eq('invited_email', user.email!)
       .eq('status', 'pending'),
   ])
 
-  const sharedProjects = (memberRows ?? [])
-    .map((r) => ({ ...(r.projects as unknown as Project), is_owner: false }))
-    .filter(Boolean)
+  // Fetch shared project details via service role so RLS doesn't block non-owner reads
+  const sharedProjectIds = (memberRows ?? []).map((r) => r.project_id as string)
+  const pendingProjectIds = (pendingInviteRows ?? []).map((r) => r.project_id as string)
+  const allNeededIds = Array.from(new Set([...sharedProjectIds, ...pendingProjectIds]))
+
+  const { data: neededProjects } = allNeededIds.length > 0
+    ? await serviceClient.from('projects').select('id, name').in('id', allNeededIds)
+    : { data: [] as { id: string; name: string }[] }
+
+  const projectNameMap = Object.fromEntries((neededProjects ?? []).map((p) => [p.id, p.name]))
+
+  const sharedProjects = sharedProjectIds.map((pid) => ({
+    id: pid,
+    name: projectNameMap[pid] ?? 'Unknown',
+    is_owner: false,
+  }))
 
   const allProjects = [
     ...(ownedProjects ?? []).map((p) => ({ ...p, is_owner: true })),
     ...sharedProjects,
   ]
 
-  const invites = (pendingInvites ?? []).map((r) => ({
+  const invites = (pendingInviteRows ?? []).map((r) => ({
     token: r.token as string,
     projectId: r.project_id as string,
-    projectName: (r.projects as any)?.name ?? 'a project',
+    projectName: projectNameMap[r.project_id as string] ?? 'Unknown project',
   }))
 
   return (

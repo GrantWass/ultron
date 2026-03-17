@@ -17,15 +17,13 @@ export async function DELETE(request: Request) {
     )
   }
 
-  // Verify project ownership
-  const { data: project } = await supabase
-    .from('projects')
-    .select('id')
-    .eq('id', project_id)
-    .eq('user_id', user.id)
-    .single()
+  // Verify access: owner OR accepted member
+  const [{ data: ownedProject }, { data: memberRow }] = await Promise.all([
+    supabase.from('projects').select('id').eq('id', project_id).eq('user_id', user.id).maybeSingle(),
+    supabase.from('project_members').select('id').eq('project_id', project_id).eq('user_id', user.id).eq('status', 'accepted').maybeSingle(),
+  ])
 
-  if (!project) {
+  if (!ownedProject && !memberRow) {
     return NextResponse.json({ error: 'Project not found' }, { status: 404 })
   }
 
