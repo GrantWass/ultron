@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServerClient } from '@supabase/ssr'
 import { ingestRatelimit } from '@/lib/redis'
+import { fingerprint } from '@/lib/fingerprint'
 import type { IngestPayload } from '@ultron/types'
 
 export const dynamic = 'force-dynamic'
@@ -98,6 +99,7 @@ export async function POST(request: Request) {
     project_id: project.id,
     event_type: e.event_type,
     message: e.message,
+    message_fingerprint: fingerprint(e.message),
     stack_trace: e.stack,
     url: e.url,
     browser: e.browser,

@@ -38,7 +38,7 @@ ${error.stack_trace ?? 'No stack trace available'}
 Based on the error and available context, provide:
 
 1. **Root Cause** — Explain what went wrong and why
-2. **Fix** — Provide the specific code change needed as a unified diff
+2. **Fix** — Provide the specific code change needed as a unified diff in a \`\`\`diff code block, with lines prefixed by \`+\` (added) or \`-\` (removed)
 3. **Edge Cases** — Any related issues or edge cases to watch for
 
 If no source files are available or they do not give insightful information, infer the fix from the error message and stack trace alone.

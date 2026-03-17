@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
+import { fingerprint } from '@/lib/fingerprint'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,12 +26,15 @@ export async function GET(request: Request) {
   ])
   if (!ownedProject && !memberRow) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
 
+  const fp = fingerprint(message)
+
+  // Match by fingerprint (new errors) OR exact message (backfilled / old rows)
   const { data: examples, count } = await supabase
     .from('errors')
     .select('id, url, browser, os, created_at', { count: 'exact' })
     .eq('project_id', project_id)
-    .eq('message', message)
     .eq('event_type', event_type)
+    .or(`message_fingerprint.eq.${fp},and(message_fingerprint.is.null,message.eq.${message})`)
     .order('created_at', { ascending: false })
     .limit(3)
 
@@ -61,12 +65,14 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'Project not found' }, { status: 404 })
   }
 
+  const fp = fingerprint(message)
+
   const { error, count } = await supabase
     .from('errors')
     .delete({ count: 'exact' })
     .eq('project_id', project_id)
-    .eq('message', message)
     .eq('event_type', event_type)
+    .or(`message_fingerprint.eq.${fp},and(message_fingerprint.is.null,message.eq.${message})`)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 

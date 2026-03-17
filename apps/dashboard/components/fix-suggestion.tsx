@@ -15,57 +15,65 @@ interface FixSuggestionProps {
 function DiffBlock({ code }: { code: string }) {
   const lines = code.split('\n')
 
-  // Extract file headers (--- / +++ lines) to show as a banner
   const fromFile = lines.find((l) => l.startsWith('--- '))?.slice(4).replace(/^a\//, '') ?? null
   const toFile   = lines.find((l) => l.startsWith('+++ '))?.slice(4).replace(/^b\//, '') ?? null
   const fileName = toFile ?? fromFile
 
-  // Track virtual line numbers per hunk
-  let oldLine = 0
-  let newLine = 0
+  let oldLine = 1
+  let newLine = 1
+
+  // Gutter cell shared styles
+  const gutter = 'w-12 shrink-0 text-right px-2 py-0.5 select-none tabular-nums leading-5'
 
   return (
-    <div className="rounded-md border border-border overflow-hidden text-xs font-mono">
+    <div className="rounded-md border border-border overflow-hidden text-xs font-mono bg-[#0d1117] dark:bg-[#0d1117]">
+      {/* File header */}
       {fileName && (
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-muted border-b border-border text-muted-foreground">
-          <span className="font-medium text-foreground truncate">{fileName}</span>
+        <div className="flex items-center gap-2 px-4 py-2 bg-[#161b22] border-b border-[#30363d] text-[#8b949e]">
+          <span className="text-[#e6edf3] font-medium truncate">{fileName}</span>
         </div>
       )}
+
       <div className="overflow-x-auto">
         {lines.map((line, i) => {
           if (line.startsWith('--- ') || line.startsWith('+++ ')) return null
 
+          // Hunk header
           if (line.startsWith('@@')) {
-            // Parse @@ -a,b +c,d @@ to reset line counters
             const m = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
             if (m) { oldLine = parseInt(m[1]); newLine = parseInt(m[2]) }
             return (
-              <div key={i} className="flex bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                <span className="w-10 shrink-0 text-right pr-3 py-0.5 select-none border-r border-blue-300/30 text-blue-400/60">…</span>
-                <span className="w-10 shrink-0 text-right pr-3 py-0.5 select-none border-r border-blue-300/30 text-blue-400/60">…</span>
+              <div key={i} className="flex bg-[#1f2d3d] text-[#79c0ff]">
+                <span className={`${gutter} text-[#3d5a7a] border-r border-[#30363d]`} />
+                <span className={`${gutter} text-[#3d5a7a] border-r border-[#30363d]`} />
+                <span className="w-6 shrink-0 border-r border-[#30363d]" />
                 <span className="px-4 py-0.5 leading-5 whitespace-pre">{line}</span>
               </div>
             )
           }
 
+          // Added line
           if (line.startsWith('+')) {
             const n = newLine++
             return (
-              <div key={i} className="flex bg-green-500/10">
-                <span className="w-10 shrink-0 text-right pr-3 py-0.5 select-none border-r border-green-300/20 text-green-700/40 dark:text-green-400/40"></span>
-                <span className="w-10 shrink-0 text-right pr-3 py-0.5 select-none border-r border-green-300/20 text-green-700/50 dark:text-green-400/50">{n}</span>
-                <span className="px-4 py-0.5 leading-5 whitespace-pre text-green-700 dark:text-green-400">{line}</span>
+              <div key={i} className="flex bg-[#0f2a1e] border-l-2 border-[#2ea043]">
+                <span className={`${gutter} text-[#3a5a3a] border-r border-[#1a3a1a]`} />
+                <span className={`${gutter} text-[#4a9a4a] border-r border-[#1a3a1a]`}>{n}</span>
+                <span className="w-6 shrink-0 flex items-center justify-center text-[#2ea043] border-r border-[#1a3a1a] select-none">+</span>
+                <span className="px-4 py-0.5 leading-5 whitespace-pre text-[#aff5b4]">{line.slice(1)}</span>
               </div>
             )
           }
 
+          // Removed line
           if (line.startsWith('-')) {
             const n = oldLine++
             return (
-              <div key={i} className="flex bg-red-500/10">
-                <span className="w-10 shrink-0 text-right pr-3 py-0.5 select-none border-r border-red-300/20 text-red-700/50 dark:text-red-400/50">{n}</span>
-                <span className="w-10 shrink-0 text-right pr-3 py-0.5 select-none border-r border-red-300/20 text-red-700/40 dark:text-red-400/40"></span>
-                <span className="px-4 py-0.5 leading-5 whitespace-pre text-red-700 dark:text-red-400">{line}</span>
+              <div key={i} className="flex bg-[#2a0f0f] border-l-2 border-[#f85149]">
+                <span className={`${gutter} text-[#9a4a4a] border-r border-[#3a1a1a]`}>{n}</span>
+                <span className={`${gutter} text-[#5a3a3a] border-r border-[#3a1a1a]`} />
+                <span className="w-6 shrink-0 flex items-center justify-center text-[#f85149] border-r border-[#3a1a1a] select-none">−</span>
+                <span className="px-4 py-0.5 leading-5 whitespace-pre text-[#ffa198]">{line.slice(1)}</span>
               </div>
             )
           }
@@ -73,10 +81,11 @@ function DiffBlock({ code }: { code: string }) {
           // Context line
           const o = oldLine++; const n = newLine++
           return (
-            <div key={i} className="flex bg-background">
-              <span className="w-10 shrink-0 text-right pr-3 py-0.5 select-none border-r border-border text-muted-foreground/50">{o}</span>
-              <span className="w-10 shrink-0 text-right pr-3 py-0.5 select-none border-r border-border text-muted-foreground/50">{n}</span>
-              <span className="px-4 py-0.5 leading-5 whitespace-pre text-foreground/70">{line}</span>
+            <div key={i} className="flex border-l-2 border-transparent">
+              <span className={`${gutter} text-[#484f58] border-r border-[#30363d]`}>{o || ''}</span>
+              <span className={`${gutter} text-[#484f58] border-r border-[#30363d]`}>{n || ''}</span>
+              <span className="w-6 shrink-0 border-r border-[#30363d]" />
+              <span className="px-4 py-0.5 leading-5 whitespace-pre text-[#8b949e]">{line}</span>
             </div>
           )
         })}
@@ -86,9 +95,12 @@ function DiffBlock({ code }: { code: string }) {
 }
 
 function CodeBlock({ code, lang }: { code: string; lang: string }) {
-  const isDiff = lang === 'diff' || lang === 'patch' ||
-    (code.split('\n').some((l) => l.startsWith('@@')) &&
-     code.split('\n').some((l) => l.startsWith('+') || l.startsWith('-')))
+  const lines = code.split('\n')
+  const changedLines = lines.filter((l) => l.startsWith('+') || l.startsWith('-'))
+  const isDiff =
+    lang === 'diff' || lang === 'patch' ||
+    // Model often skips @@ headers — just require 1+ changed lines
+    changedLines.length >= 1
   if (isDiff) return <DiffBlock code={code} />
   return (
     <pre className="rounded-md border border-border bg-muted/50 px-4 py-3 text-xs font-mono overflow-x-auto leading-5 whitespace-pre">
