@@ -48,27 +48,43 @@ function timeRangeToFrom(range: string): string | null {
 
 // ── Resolve modal ─────────────────────────────────────────────────────────────
 
+interface PreviewRow { id: string; url: string | null; browser: string | null; os: string | null; created_at: string }
+
 interface ResolveModalProps {
   error: ErrorRecord
+  projectId: string
   onConfirm: () => Promise<void>
   onCancel: () => void
   resolving: boolean
 }
 
-function ResolveModal({ error, onConfirm, onCancel, resolving }: ResolveModalProps) {
-  // Close on Escape
+function ResolveModal({ error, projectId, onConfirm, onCancel, resolving }: ResolveModalProps) {
+  const [preview, setPreview] = useState<{ count: number; examples: PreviewRow[] } | null>(null)
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onCancel() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onCancel])
 
+  useEffect(() => {
+    const params = new URLSearchParams({
+      project_id: projectId,
+      message: error.message,
+      event_type: error.event_type ?? 'error',
+    })
+    fetch(`/api/errors/resolve?${params}`)
+      .then((r) => r.json())
+      .then(setPreview)
+      .catch(() => {})
+  }, [projectId, error.message, error.event_type])
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
       onClick={(e) => { if (e.target === e.currentTarget) onCancel() }}
     >
-      <div className="w-full max-w-md rounded-xl border border-border bg-card shadow-xl">
+      <div className="w-full max-w-lg rounded-xl border border-border bg-card shadow-xl">
         {/* Header */}
         <div className="flex items-start justify-between p-5 pb-4 border-b border-border">
           <div className="flex items-center gap-2.5">
@@ -77,30 +93,47 @@ function ResolveModal({ error, onConfirm, onCancel, resolving }: ResolveModalPro
             </div>
             <div>
               <h2 className="text-sm font-semibold">Resolve error</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">This action cannot be undone</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {preview ? (
+                  <span className="text-destructive font-medium">{preview.count} occurrence{preview.count !== 1 ? 's' : ''} will be deleted</span>
+                ) : 'Loading…'}
+              </p>
             </div>
           </div>
-          <button
-            onClick={onCancel}
-            className="rounded-md p-1 hover:bg-accent transition-colors text-muted-foreground"
-          >
+          <button onClick={onCancel} className="rounded-md p-1 hover:bg-accent transition-colors text-muted-foreground">
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Body */}
         <div className="p-5 space-y-4">
-          <p className="text-sm text-muted-foreground">
-            All <span className="font-medium text-foreground">{error.event_type}</span> errors with this exact message will be permanently deleted from this project:
-          </p>
           <div className="rounded-md border border-border bg-muted/40 px-3 py-2.5">
-            <p className="font-mono text-xs text-foreground/80 break-all leading-relaxed">
-              {error.message}
-            </p>
+            <p className="font-mono text-xs text-foreground/80 break-all leading-relaxed">{error.message}</p>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Other error types or messages are not affected.
-          </p>
+
+          {/* Preview rows */}
+          {preview && preview.examples.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                {preview.examples.length < preview.count
+                  ? `First ${preview.examples.length} of ${preview.count}`
+                  : `${preview.count} occurrence${preview.count !== 1 ? 's' : ''}`}
+              </p>
+              <div className="rounded-md border border-border divide-y divide-border overflow-hidden">
+                {preview.examples.map((ex) => (
+                  <div key={ex.id} className="flex items-center gap-3 px-3 py-2 text-xs bg-background">
+                    <span className="text-muted-foreground font-mono truncate flex-1">
+                      {ex.url ? (() => { try { return new URL(ex.url).pathname } catch { return ex.url } })() : '—'}
+                    </span>
+                    {ex.browser && <span className="text-muted-foreground shrink-0">{ex.browser}</span>}
+                    <span className="text-muted-foreground shrink-0 whitespace-nowrap">{formatRelativeTime(ex.created_at)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <p className="text-xs text-muted-foreground">Only <span className="font-medium text-foreground">{error.event_type}</span> errors with this exact message are affected.</p>
         </div>
 
         {/* Footer */}
@@ -114,20 +147,10 @@ function ResolveModal({ error, onConfirm, onCancel, resolving }: ResolveModalPro
           </button>
           <button
             onClick={onConfirm}
-            disabled={resolving}
+            disabled={resolving || !preview}
             className="inline-flex items-center gap-2 rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50"
           >
-            {resolving ? (
-              <>
-                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                Resolving…
-              </>
-            ) : (
-              <>
-                <CheckCircle className="h-3.5 w-3.5" />
-                Resolve
-              </>
-            )}
+            {resolving ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" />Resolving…</> : <><CheckCircle className="h-3.5 w-3.5" />Resolve all</>}
           </button>
         </div>
       </div>
@@ -572,6 +595,7 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
       {resolveTarget && (
         <ResolveModal
           error={resolveTarget}
+          projectId={activeProjectId}
           onConfirm={confirmResolve}
           onCancel={() => { if (!resolving) setResolveTarget(null) }}
           resolving={resolving}

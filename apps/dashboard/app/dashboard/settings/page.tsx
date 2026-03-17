@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 import type { Project, GithubConnection } from '@ultron/types'
-import { Key, Github, Copy, Check, ExternalLink, Code2, Users, Trash2, Mail } from 'lucide-react'
+import { Key, Github, Copy, Check, ExternalLink, Code2, Users, Trash2, Mail, Search, Lock, RefreshCw } from 'lucide-react'
 import type { ProjectMember } from '@ultron/types'
 
 // ── SDK Setup ─────────────────────────────────────────────────────────────────
@@ -159,6 +159,9 @@ function SettingsContent() {
   const [repoOwner, setRepoOwner] = useState('')
   const [repoName, setRepoName] = useState('')
   const [savingRepo, setSavingRepo] = useState(false)
+  const [repos, setRepos] = useState<{ full_name: string; owner: string; name: string; private: boolean }[]>([])
+  const [reposLoading, setReposLoading] = useState(false)
+  const [repoSearch, setRepoSearch] = useState('')
 
   // Team
   const [members, setMembers] = useState<ProjectMember[]>([])
@@ -230,6 +233,15 @@ function SettingsContent() {
         }
       })
   }, [selectedProjectId])
+
+  useEffect(() => {
+    if (!selectedProjectId || !connection) return
+    setReposLoading(true)
+    fetch(`/api/github/repos?project_id=${selectedProjectId}`)
+      .then((r) => r.ok ? r.json() : [])
+      .then((data) => { setRepos(data); setReposLoading(false) })
+      .catch(() => setReposLoading(false))
+  }, [selectedProjectId, connection])
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId)
 
@@ -414,37 +426,87 @@ function SettingsContent() {
               Connected
             </div>
 
-            {/* Repo config */}
+            {/* Repo picker */}
             <form onSubmit={saveRepo} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">Owner / Org</label>
-                  <input
-                    type="text"
-                    value={repoOwner}
-                    onChange={(e) => setRepoOwner(e.target.value)}
-                    placeholder="octocat"
-                    className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  />
-                </div>
-                <div className="space-y-1.5">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
                   <label className="text-xs font-medium text-muted-foreground">Repository</label>
-                  <input
-                    type="text"
-                    value={repoName}
-                    onChange={(e) => setRepoName(e.target.value)}
-                    placeholder="my-app"
-                    className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  />
+                  {reposLoading && <RefreshCw className="h-3 w-3 animate-spin text-muted-foreground" />}
                 </div>
+
+                {repos.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {/* Search */}
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                      <input
+                        type="text"
+                        value={repoSearch}
+                        onChange={(e) => setRepoSearch(e.target.value)}
+                        placeholder="Search repos…"
+                        className="w-full pl-8 pr-3 py-1.5 rounded-md border border-input bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      />
+                    </div>
+                    {/* List */}
+                    <div className="rounded-md border border-border overflow-hidden max-h-52 overflow-y-auto">
+                      {repos
+                        .filter((r) => r.full_name.toLowerCase().includes(repoSearch.toLowerCase()))
+                        .map((r) => {
+                          const selected = r.owner === repoOwner && r.name === repoName
+                          return (
+                            <button
+                              key={r.full_name}
+                              type="button"
+                              onClick={() => { setRepoOwner(r.owner); setRepoName(r.name) }}
+                              className={`w-full flex items-center justify-between px-3 py-2 text-sm border-b border-border last:border-0 transition-colors text-left
+                                ${selected ? 'bg-primary/5 text-primary font-medium' : 'hover:bg-muted/50 text-foreground'}`}
+                            >
+                              <span className="flex items-center gap-2 min-w-0">
+                                <span className="truncate">{r.full_name}</span>
+                              </span>
+                              <span className="flex items-center gap-1.5 shrink-0 ml-2">
+                                {r.private && <Lock className="h-3 w-3 text-muted-foreground" />}
+                                {selected && <Check className="h-3.5 w-3.5 text-primary" />}
+                              </span>
+                            </button>
+                          )
+                        })}
+                    </div>
+                  </div>
+                ) : !reposLoading ? (
+                  /* Fallback: manual entry if repos couldn't load */
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      value={repoOwner}
+                      onChange={(e) => setRepoOwner(e.target.value)}
+                      placeholder="owner"
+                      className="rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    />
+                    <input
+                      type="text"
+                      value={repoName}
+                      onChange={(e) => setRepoName(e.target.value)}
+                      placeholder="repo-name"
+                      className="rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    />
+                  </div>
+                ) : null}
+
+                {(repoOwner && repoName) && (
+                  <p className="text-xs text-muted-foreground">
+                    Selected: <span className="font-medium text-foreground">{repoOwner}/{repoName}</span>
+                  </p>
+                )}
               </div>
+
               <div className="flex gap-2">
                 <button
                   type="submit"
-                  disabled={savingRepo}
-                  className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                  disabled={savingRepo || !repoOwner || !repoName}
+                  className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
                 >
-                  {savingRepo ? 'Saving...' : 'Save repository'}
+                  {savingRepo ? 'Saving…' : 'Save'}
                 </button>
                 <button
                   type="button"
