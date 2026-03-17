@@ -2,8 +2,7 @@ import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
-// const FROM = 'Ultron <noreply@ultron-ecru.vercel.app>'
-const FROM = "onboarding@resend.dev"
+const FROM = "Ultron <noreply@ultron.live>"
 
 export async function sendInviteEmail({
   to,
@@ -44,7 +43,7 @@ export async function sendInviteEmail({
 
         <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0">
         <p style="color:#94a3b8;font-size:12px;margin:0">
-          <a href="https://ultron-ecru.vercel.app" style="color:#94a3b8">ultron-ecru.vercel.app</a>
+          <a href="https://ultron.live" style="color:#94a3b8">ultron.live</a>
         </p>
       </div>
     `,

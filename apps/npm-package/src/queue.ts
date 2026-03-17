@@ -2,7 +2,7 @@ import type { ErrorPayload, IngestBody, TrackerConfig } from './types'
 
 const FLUSH_INTERVAL_MS = 5000
 const MAX_QUEUE_SIZE = 50
-const INGEST_URL = 'https://ultron-ecru.vercel.app/api/ingest'
+const INGEST_URL = 'https://ultron.live/api/ingest'
 
 export class ErrorQueue {
   private queue: ErrorPayload[] = []

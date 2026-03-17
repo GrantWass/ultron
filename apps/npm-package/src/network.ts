@@ -136,7 +136,7 @@ function isCorsError(reqUrl: string, errStr: string): boolean {
 }
 
 function shouldIgnore(reqUrl: string): boolean {
-  return reqUrl.includes('ultron-ecru.vercel.app/api/ingest')
+  return reqUrl.includes('ultron.live/api/ingest')
 }
 
 // ── Fetch ─────────────────────────────────────────────────────────────────
