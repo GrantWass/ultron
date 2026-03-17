@@ -9,7 +9,7 @@ export async function GET(
   { params }: { params: Promise<{ token: string }> }
 ) {
   const { token } = await params
-  const serviceClient = await createServiceRoleClient()
+  const serviceClient = createServiceRoleClient()
 
   const { data: invite } = await serviceClient
     .from('project_members')
@@ -37,7 +37,7 @@ export async function POST(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const serviceClient = await createServiceRoleClient()
+  const serviceClient = createServiceRoleClient()
 
   const { data: invite } = await serviceClient
     .from('project_members')

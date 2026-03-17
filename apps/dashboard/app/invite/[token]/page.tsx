@@ -20,7 +20,7 @@ export default async function InvitePage({
   }
 
   // Fetch invite using service role (public lookup by token)
-  const serviceClient = await createServiceRoleClient()
+  const serviceClient = createServiceRoleClient()
   const { data: invite } = await serviceClient
     .from('project_members')
     .select('id, invited_email, status, project_id, projects(name)')

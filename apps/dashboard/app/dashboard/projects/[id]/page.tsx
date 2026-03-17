@@ -13,7 +13,7 @@ export default async function ProjectErrorsPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const serviceClient = await createServiceRoleClient()
+  const serviceClient = createServiceRoleClient()
 
   // Check access: owner OR accepted member (explicit checks, not relying on RLS alone)
   const [

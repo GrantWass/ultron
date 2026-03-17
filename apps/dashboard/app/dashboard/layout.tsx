@@ -12,7 +12,7 @@ export default async function DashboardLayout({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const serviceClient = await createServiceRoleClient()
+  const serviceClient = createServiceRoleClient()
 
   const [
     { data: ownedProjects },

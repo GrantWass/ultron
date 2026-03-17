@@ -9,7 +9,7 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const serviceClient = await createServiceRoleClient()
+  const serviceClient = createServiceRoleClient()
 
   const [
     { data: ownedProjects },
