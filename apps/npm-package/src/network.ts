@@ -50,14 +50,17 @@ function parseEndpoint(reqUrl: string): string {
   catch { return reqUrl.split('?')[0] }
 }
 
-/** Attempt to read response body text, capped at RESPONSE_BODY_LIMIT chars */
-async function readResponseBody(response: Response): Promise<string | null> {
+/** Attempt to read response body text, capped at RESPONSE_BODY_LIMIT chars.
+ *  Returns both the (truncated) preview and the full byte size. */
+async function readResponseBody(response: Response): Promise<{ preview: string; size: number } | null> {
   try {
     const ct = response.headers.get('content-type') ?? ''
     if (BODY_SKIP_TYPES.some((t) => ct.includes(t))) return null
     const clone = response.clone() // must clone — body can only be read once
     const text = await clone.text()
-    return text.slice(0, RESPONSE_BODY_LIMIT) + (text.length > RESPONSE_BODY_LIMIT ? '…' : '')
+    const size = new TextEncoder().encode(text).length
+    const preview = text.slice(0, RESPONSE_BODY_LIMIT) + (text.length > RESPONSE_BODY_LIMIT ? '…' : '')
+    return { preview, size }
   } catch { return null }
 }
 
@@ -166,7 +169,7 @@ export function monitorNetwork(queue: ErrorQueue, config: TrackerConfig): void {
         const category = categorize(status, false, slow)
 
         // Read body async — don't block the response returning to the caller
-        readResponseBody(response).then((responseBody) => {
+        readResponseBody(response).then((bodyResult) => {
           queue.enqueue(
             makePayload(
               buildMessage(method, reqUrl, status, duration, category),
@@ -181,7 +184,8 @@ export function monitorNetwork(queue: ErrorQueue, config: TrackerConfig): void {
                 duration,
                 slow,
                 cors: false,
-                response_body: responseBody,
+                response_body: bodyResult?.preview ?? null,
+                response_body_size: bodyResult?.size ?? null,
                 timing: getTimingBreakdown(reqUrl),
                 page: window.location.pathname,
                 referrer: document.referrer || null,
@@ -251,9 +255,11 @@ export function monitorNetwork(queue: ErrorQueue, config: TrackerConfig): void {
 
           // Read XHR response body (already available at loadend)
           let responseBody: string | null = null
+          let responseBodySize: number | null = null
           try {
             const ct: string = this.getResponseHeader('content-type') ?? ''
             if (!BODY_SKIP_TYPES.some((t) => ct.includes(t)) && typeof this.responseText === 'string') {
+              responseBodySize = new TextEncoder().encode(this.responseText).length
               responseBody = this.responseText.slice(0, RESPONSE_BODY_LIMIT) +
                 (this.responseText.length > RESPONSE_BODY_LIMIT ? '…' : '')
             }
@@ -274,6 +280,7 @@ export function monitorNetwork(queue: ErrorQueue, config: TrackerConfig): void {
                 slow,
                 cors,
                 response_body: responseBody,
+                response_body_size: responseBodySize,
                 timing: getTimingBreakdown(reqUrl),
                 page: window.location.pathname,
                 referrer: document.referrer || null,

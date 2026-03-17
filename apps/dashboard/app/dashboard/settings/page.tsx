@@ -336,7 +336,7 @@ function SettingsContent() {
             Team
           </h2>
           <p className="text-xs text-muted-foreground">
-            Invite collaborators to view this project&apos;s error logs.
+            Invite collaborators to view <span className="font-medium text-foreground">{selectedProject?.name}</span>&apos;s error logs.
           </p>
 
           {/* Invite form */}

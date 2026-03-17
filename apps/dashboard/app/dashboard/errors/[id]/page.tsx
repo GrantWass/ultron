@@ -80,8 +80,31 @@ function NetworkDetail({ meta }: { meta: Record<string, unknown> }) {
       {/* Response body */}
       {meta.response_body != null && (
         <div className="rounded-md border border-border overflow-hidden">
-          <div className="px-4 py-2 border-b border-border bg-muted/50">
-            <h2 className="text-sm font-medium">Response Body <span className="text-muted-foreground font-normal">(first 500 chars)</span></h2>
+          <div className="px-4 py-2 border-b border-border bg-muted/50 flex items-center justify-between">
+            <h2 className="text-sm font-medium">
+              Response Body{' '}
+              <span className="text-muted-foreground font-normal">(first 500 chars)</span>
+            </h2>
+            {meta.response_body_size != null && (() => {
+              const bytes = meta.response_body_size as number
+              const kb = bytes / 1024
+              const label = kb >= 1024
+                ? `${(kb / 1024).toFixed(1)} MB`
+                : kb >= 1
+                  ? `${kb.toFixed(1)} KB`
+                  : `${bytes} B`
+              const large = bytes >= 500_000   // ≥ 500 KB
+              const warn  = bytes >= 100_000   // ≥ 100 KB
+              return (
+                <span className={`text-xs font-mono px-2 py-0.5 rounded-full ${
+                  large ? 'bg-destructive/15 text-destructive font-semibold'
+                        : warn  ? 'bg-yellow-500/15 text-yellow-600 font-semibold'
+                                : 'bg-muted text-muted-foreground'
+                }`}>
+                  {large ? '⚠ ' : warn ? '⚠ ' : ''}{label}
+                </span>
+              )
+            })()}
           </div>
           <pre className="p-4 text-xs font-mono overflow-x-auto whitespace-pre-wrap text-foreground/80">
             {String(meta.response_body)}

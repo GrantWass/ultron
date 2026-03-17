@@ -148,6 +148,18 @@ create trigger on_auth_user_created
 -- PROJECT MEMBERS (collaborators / invites)
 -- ============================================================
 
+-- Security definer function to check project ownership without triggering RLS recursion
+-- (avoids infinite loop: projects policy → project_members → projects policy)
+create or replace function get_project_owner(project_id uuid)
+returns uuid
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select user_id from projects where id = project_id;
+$$;
+
 create table if not exists project_members (
   id            uuid primary key default gen_random_uuid(),
   project_id    uuid references projects(id) on delete cascade not null,
@@ -164,22 +176,17 @@ create table if not exists project_members (
 alter table project_members enable row level security;
 
 -- Owner can do everything with their project's members
+-- Uses security definer function to avoid RLS recursion with projects table
 create policy "Project owners can manage members"
   on project_members for all
-  using (
-    exists (
-      select 1 from projects
-      where projects.id = project_members.project_id
-        and projects.user_id = auth.uid()
-    )
-  );
+  using (get_project_owner(project_members.project_id) = auth.uid());
 
 -- Members can see their own invite rows
 create policy "Members can view own membership"
   on project_members for select
   using (
     auth.uid() = user_id
-    or invited_email = (select email from auth.users where id = auth.uid())
+    or invited_email = auth.email()
   );
 
 -- projects: members can read projects they've accepted
