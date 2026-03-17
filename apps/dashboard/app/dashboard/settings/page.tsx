@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 import type { Project, GithubConnection } from '@ultron/types'
-import { Key, Github, Copy, Check, ExternalLink, Code2, Users, Trash2, Mail, Search, Lock, RefreshCw } from 'lucide-react'
+import { Key, Github, Copy, Check, ExternalLink, Code2, Users, Trash2, Mail, Search, Lock, RefreshCw, ChevronDown } from 'lucide-react'
 import type { ProjectMember } from '@ultron/types'
 
 // ── SDK Setup ─────────────────────────────────────────────────────────────────
@@ -107,12 +107,8 @@ function SdkSetup({ apiKey }: { apiKey: string }) {
   }
 
   return (
-    <div className="rounded-md border border-border overflow-hidden bg-muted/30">
-      <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-3 flex-wrap">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-          <Code2 className="h-3.5 w-3.5" />
-          SDK Setup
-        </h3>
+    <>
+      <div className="px-4 py-3 border-b border-border flex items-center justify-end gap-3 flex-wrap">
         <div className="flex gap-1 rounded-md border border-border p-1 bg-background">
           {FRAMEWORKS.map(({ value, label }) => (
             <button
@@ -141,6 +137,26 @@ function SdkSetup({ apiKey }: { apiKey: string }) {
           {copied ? 'Copied!' : 'Copy'}
         </button>
       </div>
+    </>
+  )
+}
+
+function SdkSetupCollapsible({ apiKey }: { apiKey: string }) {
+  const [open, setOpen] = useState(true)
+  return (
+    <div className="rounded-md border border-border overflow-hidden bg-muted/30">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 border-b border-border hover:bg-muted/40 transition-colors"
+      >
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <Code2 className="h-3.5 w-3.5" />
+          SDK Setup
+        </h3>
+        <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${open ? '' : '-rotate-90'}`} />
+      </button>
+      {open && <SdkSetup apiKey={apiKey} />}
     </div>
   )
 }
@@ -162,6 +178,7 @@ function SettingsContent() {
   const [repos, setRepos] = useState<{ full_name: string; owner: string; name: string; private: boolean }[]>([])
   const [reposLoading, setReposLoading] = useState(false)
   const [repoSearch, setRepoSearch] = useState('')
+  const [editingRepo, setEditingRepo] = useState(false)
 
   // Team
   const [members, setMembers] = useState<ProjectMember[]>([])
@@ -226,10 +243,12 @@ function SettingsContent() {
           setConnection(data)
           setRepoOwner(data.repo_owner ?? '')
           setRepoName(data.repo_name ?? '')
+          setEditingRepo(!(data.repo_owner && data.repo_name))
         } else {
           setConnection(null)
           setRepoOwner('')
           setRepoName('')
+          setEditingRepo(false)
         }
       })
   }, [selectedProjectId])
@@ -256,7 +275,7 @@ function SettingsContent() {
     e.preventDefault()
     if (!selectedProjectId) return
     setSavingRepo(true)
-    await fetch('/api/github/connection', {
+    const res = await fetch('/api/github/connection', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -266,6 +285,10 @@ function SettingsContent() {
       }),
     })
     setSavingRepo(false)
+    if (res.ok) {
+      setConnection((prev) => prev ? { ...prev, repo_owner: repoOwner, repo_name: repoName } : prev)
+      setEditingRepo(false)
+    }
   }
 
   async function disconnectGitHub() {
@@ -336,7 +359,7 @@ function SettingsContent() {
           </div>
 
           {/* SDK Install instructions */}
-          <SdkSetup apiKey={selectedProject.api_key} />
+          <SdkSetupCollapsible apiKey={selectedProject.api_key} />
         </div>
       )}
 
@@ -426,97 +449,124 @@ function SettingsContent() {
               Connected
             </div>
 
-            {/* Repo picker */}
-            <form onSubmit={saveRepo} className="space-y-3">
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-muted-foreground">Repository</label>
-                  {reposLoading && <RefreshCw className="h-3 w-3 animate-spin text-muted-foreground" />}
+            {/* Repo display / picker */}
+            {!editingRepo && connection?.repo_owner && connection?.repo_name ? (
+              <div className="flex items-center justify-between rounded-md border border-border bg-muted/30 px-3 py-2.5">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Code2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span>{connection.repo_owner}/{connection.repo_name}</span>
                 </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingRepo(true)}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Change
+                  </button>
+                  <button
+                    type="button"
+                    onClick={disconnectGitHub}
+                    className="text-xs text-destructive hover:text-destructive/80 transition-colors"
+                  >
+                    Disconnect
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={saveRepo} className="space-y-3">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-medium text-muted-foreground">Repository</label>
+                    {reposLoading && <RefreshCw className="h-3 w-3 animate-spin text-muted-foreground" />}
+                  </div>
 
-                {repos.length > 0 ? (
-                  <div className="space-y-1.5">
-                    {/* Search */}
-                    <div className="relative">
-                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  {repos.length > 0 ? (
+                    <div className="space-y-1.5">
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                        <input
+                          type="text"
+                          value={repoSearch}
+                          onChange={(e) => setRepoSearch(e.target.value)}
+                          placeholder="Search repos…"
+                          className="w-full pl-8 pr-3 py-1.5 rounded-md border border-input bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        />
+                      </div>
+                      <div className="rounded-md border border-border overflow-hidden max-h-52 overflow-y-auto">
+                        {repos
+                          .filter((r) => r.full_name.toLowerCase().includes(repoSearch.toLowerCase()))
+                          .map((r) => {
+                            const selected = r.owner === repoOwner && r.name === repoName
+                            return (
+                              <button
+                                key={r.full_name}
+                                type="button"
+                                onClick={() => { setRepoOwner(r.owner); setRepoName(r.name) }}
+                                className={`w-full flex items-center justify-between px-3 py-2 text-sm border-b border-border last:border-0 transition-colors text-left
+                                  ${selected ? 'bg-primary/5 text-primary font-medium' : 'hover:bg-muted/50 text-foreground'}`}
+                              >
+                                <span className="truncate">{r.full_name}</span>
+                                <span className="flex items-center gap-1.5 shrink-0 ml-2">
+                                  {r.private && <Lock className="h-3 w-3 text-muted-foreground" />}
+                                  {selected && <Check className="h-3.5 w-3.5 text-primary" />}
+                                </span>
+                              </button>
+                            )
+                          })}
+                      </div>
+                    </div>
+                  ) : !reposLoading ? (
+                    <div className="grid grid-cols-2 gap-2">
                       <input
                         type="text"
-                        value={repoSearch}
-                        onChange={(e) => setRepoSearch(e.target.value)}
-                        placeholder="Search repos…"
-                        className="w-full pl-8 pr-3 py-1.5 rounded-md border border-input bg-background text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        value={repoOwner}
+                        onChange={(e) => setRepoOwner(e.target.value)}
+                        placeholder="owner"
+                        className="rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      />
+                      <input
+                        type="text"
+                        value={repoName}
+                        onChange={(e) => setRepoName(e.target.value)}
+                        placeholder="repo-name"
+                        className="rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       />
                     </div>
-                    {/* List */}
-                    <div className="rounded-md border border-border overflow-hidden max-h-52 overflow-y-auto">
-                      {repos
-                        .filter((r) => r.full_name.toLowerCase().includes(repoSearch.toLowerCase()))
-                        .map((r) => {
-                          const selected = r.owner === repoOwner && r.name === repoName
-                          return (
-                            <button
-                              key={r.full_name}
-                              type="button"
-                              onClick={() => { setRepoOwner(r.owner); setRepoName(r.name) }}
-                              className={`w-full flex items-center justify-between px-3 py-2 text-sm border-b border-border last:border-0 transition-colors text-left
-                                ${selected ? 'bg-primary/5 text-primary font-medium' : 'hover:bg-muted/50 text-foreground'}`}
-                            >
-                              <span className="flex items-center gap-2 min-w-0">
-                                <span className="truncate">{r.full_name}</span>
-                              </span>
-                              <span className="flex items-center gap-1.5 shrink-0 ml-2">
-                                {r.private && <Lock className="h-3 w-3 text-muted-foreground" />}
-                                {selected && <Check className="h-3.5 w-3.5 text-primary" />}
-                              </span>
-                            </button>
-                          )
-                        })}
-                    </div>
-                  </div>
-                ) : !reposLoading ? (
-                  /* Fallback: manual entry if repos couldn't load */
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      type="text"
-                      value={repoOwner}
-                      onChange={(e) => setRepoOwner(e.target.value)}
-                      placeholder="owner"
-                      className="rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    />
-                    <input
-                      type="text"
-                      value={repoName}
-                      onChange={(e) => setRepoName(e.target.value)}
-                      placeholder="repo-name"
-                      className="rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    />
-                  </div>
-                ) : null}
+                  ) : null}
+                </div>
 
-                {(repoOwner && repoName) && (
-                  <p className="text-xs text-muted-foreground">
-                    Selected: <span className="font-medium text-foreground">{repoOwner}/{repoName}</span>
-                  </p>
-                )}
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  type="submit"
-                  disabled={savingRepo || !repoOwner || !repoName}
-                  className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
-                >
-                  {savingRepo ? 'Saving…' : 'Save'}
-                </button>
-                <button
-                  type="button"
-                  onClick={disconnectGitHub}
-                  className="rounded-md border border-destructive px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 transition-colors"
-                >
-                  Disconnect
-                </button>
-              </div>
-            </form>
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    disabled={savingRepo || !repoOwner || !repoName}
+                    className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                  >
+                    {savingRepo ? 'Saving…' : 'Save'}
+                  </button>
+                  {connection?.repo_owner && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRepoOwner(connection.repo_owner ?? '')
+                        setRepoName(connection.repo_name ?? '')
+                        setEditingRepo(false)
+                      }}
+                      className="rounded-md border border-input px-3 py-1.5 text-sm hover:bg-accent transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={disconnectGitHub}
+                    className="rounded-md border border-destructive px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                  >
+                    Disconnect
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         ) : (
           <a

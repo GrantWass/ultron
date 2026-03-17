@@ -41,7 +41,8 @@ Based on the error and available context, provide:
 2. **Fix** — Provide the specific code change needed as a unified diff
 3. **Edge Cases** — Any related issues or edge cases to watch for
 
-If no source files are available, infer the fix from the error message and stack trace alone.`
+If no source files are available, infer the fix from the error message and stack trace alone.
+Respond in a clear and concise manner, focusing on actionable insights for the developer.`
 }
 
 export async function POST(request: Request) {
@@ -122,8 +123,19 @@ export async function POST(request: Request) {
   let files: RelevantFile[] = []
   const githubConn = (error as any).projects?.github_connections?.[0]
 
+  // TODO: delete
+  console.log('[fix] GitHub connection present:', !!githubConn)
+  // TODO: delete
+  console.log('[fix] GitHub connection details:', {
+    hasToken: !!githubConn?.access_token,
+    repo_owner: githubConn?.repo_owner ?? null,
+    repo_name: githubConn?.repo_name ?? null,
+  })
+
   if (githubConn?.access_token && githubConn.repo_owner && githubConn.repo_name) {
     const filePaths = parseStackTrace(error.stack_trace ?? '')
+    // TODO: delete
+    console.log('[fix] Parsed file paths from stack trace:', filePaths)
     if (filePaths.length > 0) {
       try {
         files = await fetchGitHubFiles(
@@ -132,11 +144,26 @@ export async function POST(request: Request) {
           githubConn.repo_name,
           filePaths
         )
+        // TODO: delete
+        console.log('[fix] Files fetched from GitHub:', files.map((f) => ({
+          path: f.path,
+          chars: f.content.length,
+          preview: f.content.slice(0, 300),
+        })))
       } catch (err) {
         console.error('Failed to fetch GitHub files:', err)
       }
+    } else {
+      // TODO: delete
+      console.log('[fix] No file paths parsed from stack trace — skipping GitHub fetch')
     }
+  } else {
+    // TODO: delete
+    console.log('[fix] Skipping GitHub fetch — missing token, repo owner, or repo name')
   }
+
+  // TODO: delete
+  console.log('[fix] Total files passed to model:', files.length)
 
   const prompt = buildPrompt(error as ErrorRecord, files)
 
