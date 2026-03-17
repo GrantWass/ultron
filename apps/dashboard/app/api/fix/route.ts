@@ -210,7 +210,7 @@ export async function POST(request: Request) {
   const result = streamText({
     model: openai('gpt-5-mini'),
     messages: [{ role: 'user', content: prompt }],
-    maxTokens: 4096,
+    maxTokens: 16000,
     onFinish: async ({ text }) => {
       await service.from('fix_suggestions').insert({
         error_id: errorId,
@@ -221,4 +221,17 @@ export async function POST(request: Request) {
   })
 
   return result.toDataStreamResponse()
+}
+
+export async function DELETE(request: Request) {
+  const supabase = await createServerClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+
+  const { error_id } = await request.json()
+  if (!error_id) return new Response(JSON.stringify({ error: 'error_id required' }), { status: 400 })
+
+  const service = createServiceRoleClient()
+  await service.from('fix_suggestions').delete().eq('error_id', error_id)
+  return new Response(null, { status: 204 })
 }

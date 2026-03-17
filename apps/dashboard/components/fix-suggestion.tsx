@@ -234,6 +234,17 @@ export function FixSuggestion({ errorId, existingSuggestion, githubRepo }: FixSu
     await complete('', { body: { error_id: errorId } })
   }
 
+  async function handleRegenerate() {
+    // Delete cached suggestion so the server generates a fresh one
+    await fetch('/api/fix', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ error_id: errorId }),
+    })
+    setShowFix(true)
+    await complete('', { body: { error_id: errorId } })
+  }
+
   const displayText = completion || existingSuggestion
 
   return (
@@ -265,7 +276,7 @@ export function FixSuggestion({ errorId, existingSuggestion, githubRepo }: FixSu
 
         {displayText && !isLoading && (
           <button
-            onClick={handleSuggestFix}
+            onClick={handleRegenerate}
             className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             <RefreshCw className="h-3 w-3" />

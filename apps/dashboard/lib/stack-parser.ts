@@ -50,16 +50,60 @@ export function parseStackTrace(stackTrace: string): string[] {
 /**
  * Extract meaningful search keywords from an error message + stack trace.
  * Prioritises: property names in quotes, PascalCase identifiers (component/class names),
- * and function names from the top stack frames.
+ * and function names from the top stack frames. Omits common generic identifiers and framework internals.
  * Returns at most 5 unique tokens, best for a GitHub code search query.
  */
 const SKIP_IDENTIFIERS = new Set([
+  // JS primitives / error types
   'Error', 'TypeError', 'Cannot', 'ReferenceError', 'SyntaxError', 'RangeError',
-  'anonymous', 'default', 'undefined', 'null', 'true', 'false',
-  'onClick', 'onChange', 'onSubmit', 'onLoad', 'onError',   // generic handlers
+  'EvalError', 'URIError', 'AggregateError',
+  'anonymous', 'default', 'undefined', 'null', 'true', 'false', 'Object', 'Array',
+  'Promise', 'then', 'catch', 'finally', 'resolve', 'reject',
+
+  // Generic browser event handlers
+  'onClick', 'onChange', 'onSubmit', 'onLoad', 'onError', 'onFocus', 'onBlur',
+  'onKeyDown', 'onKeyUp', 'onMouseDown', 'onMouseUp', 'onMouseMove', 'onScroll',
+  'onInput', 'onReset', 'onSelect', 'onPointerDown', 'onPointerUp',
+  'addEventListener', 'removeEventListener', 'dispatchEvent',
+
+  // React / React DOM internals
   'executeDispatch', 'runWithFiberInDEV', 'processDispatchQueue',
-  'batchedUpdates', 'dispatchEvent', 'dispatchDiscreteEvent',
-  'dispatchEventForPluginEventSystem',
+  'batchedUpdates', 'dispatchDiscreteEvent', 'dispatchEventForPluginEventSystem',
+  'commitRoot', 'commitWork', 'commitMutationEffects', 'commitLayoutEffects',
+  'commitPassiveEffects', 'invokePassiveEffectCreate',
+  'renderWithHooks', 'updateFunctionComponent', 'updateClassComponent',
+  'reconcileChildren', 'reconcileChildFibers', 'createFiberFromElement',
+  'performSyncWorkOnRoot', 'performConcurrentWorkOnRoot', 'performUnitOfWork',
+  'workLoopSync', 'workLoopConcurrent', 'flushPassiveEffects', 'flushSyncCallbackQueue',
+  'callCallback', 'invokeGuardedCallback', 'invokeGuardedCallbackDev',
+  'unstable_scheduleCallback', 'flushWork', 'workLoop',
+  'createElement', 'cloneElement', 'createContext', 'forwardRef', 'memo',
+  'useState', 'useEffect', 'useLayoutEffect', 'useReducer', 'useCallback',
+  'useMemo', 'useRef', 'useContext', 'useImperativeHandle',
+
+  // Next.js internals
+  'AppRouter', 'ClientRouter', 'ServerRouter', 'renderToString',
+  'clientComponentLoadingModuleProxy', 'hydrate', 'hydrateRoot',
+
+  // Vue 3 internals
+  'callWithErrorHandling', 'callWithAsyncErrorHandling',
+  'mountComponent', 'updateComponent', 'renderComponentRoot',
+  'normalizeVNode', 'createVNode', 'patch', 'nextTick',
+  'createApp', 'defineComponent',
+
+  // Svelte internals
+  'create_component', 'mount_component', 'destroy_component', 'create_fragment',
+  'flush', 'schedule_update', 'dirty_components',
+
+  // Angular internals
+  'checkAndUpdateView', 'detectChangesInternal', 'callViewAction',
+  'execComponentViewsAction', 'execEmbeddedViewsAction',
+
+  // Webpack / bundler runtime
+  'webpackJsonpCallback', 'requireModule', 'hotApply',
+
+  // Node / runtime internals
+  'Module._compile', 'processTicksAndRejections', 'AsyncLocalStorage',
 ])
 
 export function extractSearchKeywords(message: string, stackTrace: string): string[] {
