@@ -14,29 +14,73 @@ interface FixSuggestionProps {
 
 function DiffBlock({ code }: { code: string }) {
   const lines = code.split('\n')
+
+  // Extract file headers (--- / +++ lines) to show as a banner
+  const fromFile = lines.find((l) => l.startsWith('--- '))?.slice(4).replace(/^a\//, '') ?? null
+  const toFile   = lines.find((l) => l.startsWith('+++ '))?.slice(4).replace(/^b\//, '') ?? null
+  const fileName = toFile ?? fromFile
+
+  // Track virtual line numbers per hunk
+  let oldLine = 0
+  let newLine = 0
+
   return (
     <div className="rounded-md border border-border overflow-hidden text-xs font-mono">
-      {lines.map((line, i) => {
-        let bg = 'bg-background'
-        let fg = 'text-foreground/80'
-        let prefix = ''
-        if (line.startsWith('+++') || line.startsWith('---')) {
-          bg = 'bg-muted'; fg = 'text-muted-foreground'; prefix = ''
-        } else if (line.startsWith('@@')) {
-          bg = 'bg-blue-500/10'; fg = 'text-blue-600 dark:text-blue-400'
-        } else if (line.startsWith('+')) {
-          bg = 'bg-green-500/10'; fg = 'text-green-700 dark:text-green-400'
-          prefix = '+'
-        } else if (line.startsWith('-')) {
-          bg = 'bg-red-500/10'; fg = 'text-red-700 dark:text-red-400'
-          prefix = '-'
-        }
-        return (
-          <div key={i} className={`px-4 py-0.5 leading-5 whitespace-pre ${bg} ${fg}`}>
-            {prefix ? line : line}
-          </div>
-        )
-      })}
+      {fileName && (
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-muted border-b border-border text-muted-foreground">
+          <span className="font-medium text-foreground truncate">{fileName}</span>
+        </div>
+      )}
+      <div className="overflow-x-auto">
+        {lines.map((line, i) => {
+          if (line.startsWith('--- ') || line.startsWith('+++ ')) return null
+
+          if (line.startsWith('@@')) {
+            // Parse @@ -a,b +c,d @@ to reset line counters
+            const m = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
+            if (m) { oldLine = parseInt(m[1]); newLine = parseInt(m[2]) }
+            return (
+              <div key={i} className="flex bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                <span className="w-10 shrink-0 text-right pr-3 py-0.5 select-none border-r border-blue-300/30 text-blue-400/60">…</span>
+                <span className="w-10 shrink-0 text-right pr-3 py-0.5 select-none border-r border-blue-300/30 text-blue-400/60">…</span>
+                <span className="px-4 py-0.5 leading-5 whitespace-pre">{line}</span>
+              </div>
+            )
+          }
+
+          if (line.startsWith('+')) {
+            const n = newLine++
+            return (
+              <div key={i} className="flex bg-green-500/10">
+                <span className="w-10 shrink-0 text-right pr-3 py-0.5 select-none border-r border-green-300/20 text-green-700/40 dark:text-green-400/40"></span>
+                <span className="w-10 shrink-0 text-right pr-3 py-0.5 select-none border-r border-green-300/20 text-green-700/50 dark:text-green-400/50">{n}</span>
+                <span className="px-4 py-0.5 leading-5 whitespace-pre text-green-700 dark:text-green-400">{line}</span>
+              </div>
+            )
+          }
+
+          if (line.startsWith('-')) {
+            const n = oldLine++
+            return (
+              <div key={i} className="flex bg-red-500/10">
+                <span className="w-10 shrink-0 text-right pr-3 py-0.5 select-none border-r border-red-300/20 text-red-700/50 dark:text-red-400/50">{n}</span>
+                <span className="w-10 shrink-0 text-right pr-3 py-0.5 select-none border-r border-red-300/20 text-red-700/40 dark:text-red-400/40"></span>
+                <span className="px-4 py-0.5 leading-5 whitespace-pre text-red-700 dark:text-red-400">{line}</span>
+              </div>
+            )
+          }
+
+          // Context line
+          const o = oldLine++; const n = newLine++
+          return (
+            <div key={i} className="flex bg-background">
+              <span className="w-10 shrink-0 text-right pr-3 py-0.5 select-none border-r border-border text-muted-foreground/50">{o}</span>
+              <span className="w-10 shrink-0 text-right pr-3 py-0.5 select-none border-r border-border text-muted-foreground/50">{n}</span>
+              <span className="px-4 py-0.5 leading-5 whitespace-pre text-foreground/70">{line}</span>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
