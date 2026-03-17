@@ -5,14 +5,21 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import type { Project } from '@ultron/types'
-import { AlertCircle, FolderOpen, Settings, LogOut, Zap, Users } from 'lucide-react'
+import { AlertCircle, FolderOpen, Settings, LogOut, Zap, Users, Mail } from 'lucide-react'
+
+interface PendingInvite {
+  token: string
+  projectId: string
+  projectName: string
+}
 
 interface SidebarProps {
   projects: Project[]
   currentProjectId?: string
+  pendingInvites?: PendingInvite[]
 }
 
-export function Sidebar({ projects, currentProjectId }: SidebarProps) {
+export function Sidebar({ projects, currentProjectId, pendingInvites }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -55,6 +62,28 @@ export function Sidebar({ projects, currentProjectId }: SidebarProps) {
             <span className="truncate">{project.name}</span>
           </Link>
         ))}
+
+        {/* Pending invites */}
+        {pendingInvites && pendingInvites.length > 0 && (
+          <>
+            <p className="px-2 pt-3 pb-1 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Pending Invites
+            </p>
+            {pendingInvites.map((invite) => (
+              <Link
+                key={invite.token}
+                href={`/invite/${invite.token}`}
+                className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors text-yellow-600 dark:text-yellow-400 hover:bg-accent hover:text-accent-foreground"
+              >
+                <Mail className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{invite.projectName}</span>
+                <span className="ml-auto text-[10px] font-medium rounded-full bg-yellow-500/15 px-1.5 py-0.5 shrink-0">
+                  Accept
+                </span>
+              </Link>
+            ))}
+          </>
+        )}
 
         <Link
           href="/dashboard/projects"
