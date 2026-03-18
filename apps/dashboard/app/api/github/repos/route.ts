@@ -14,14 +14,19 @@ export async function GET(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // Verify ownership
+  // Verify project access (owner or member)
   const { data: project } = await supabase
     .from('projects').select('id').eq('id', projectId).eq('user_id', user.id).single()
-  if (!project) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!project) {
+    const { data: member } = await supabase
+      .from('project_members').select('project_id')
+      .eq('project_id', projectId).eq('user_id', user.id).eq('status', 'accepted').single()
+    if (!member) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
 
-  // Get stored token
+  // Get user's GitHub token
   const { data: conn } = await supabase
-    .from('github_connections').select('access_token').eq('project_id', projectId).single()
+    .from('github_user_connections').select('access_token').eq('user_id', user.id).single()
   if (!conn) return NextResponse.json({ error: 'Not connected' }, { status: 404 })
 
   let token: string
@@ -29,7 +34,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Token decryption failed' }, { status: 500 })
   }
 
-  // Fetch all repos the user has access to (up to 100)
   const res = await fetch('https://api.github.com/user/repos?sort=updated&per_page=100&type=all', {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.v3+json' },
   })

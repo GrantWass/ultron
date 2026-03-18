@@ -47,13 +47,21 @@ create table if not exists errors (
 create index if not exists errors_project_id_created_at
   on errors(project_id, created_at desc);
 
--- GitHub repo connections (one per project)
+-- GitHub OAuth connection (one per user — shared across all their projects)
+create table if not exists github_user_connections (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade not null unique,
+  access_token text not null,  -- AES-256-GCM encrypted
+  github_username text not null default '',
+  created_at timestamptz not null default now()
+);
+
+-- GitHub repo selection (one per project — no token stored here)
 create table if not exists github_connections (
   id uuid primary key default gen_random_uuid(),
   project_id uuid references projects(id) on delete cascade not null unique,
   repo_owner text not null default '',
   repo_name text not null default '',
-  access_token text not null,  -- AES-256-GCM encrypted
   created_at timestamptz not null default now()
 );
 
@@ -73,6 +81,7 @@ create table if not exists fix_suggestions (
 alter table profiles enable row level security;
 alter table projects enable row level security;
 alter table errors enable row level security;
+alter table github_user_connections enable row level security;
 alter table github_connections enable row level security;
 alter table fix_suggestions enable row level security;
 
@@ -97,14 +106,30 @@ create policy "Project owners can manage errors"
     )
   );
 
--- github_connections: project owner
-create policy "Project owners can manage github connections"
+-- github_user_connections: each user manages their own
+create policy "Users can manage own github connection"
+  on github_user_connections for all
+  using (auth.uid() = user_id);
+
+-- github_connections: project owner manages repo selection; members can read
+create policy "Project owners can manage github repo selection"
   on github_connections for all
   using (
     exists (
       select 1 from projects
       where projects.id = github_connections.project_id
         and projects.user_id = auth.uid()
+    )
+  );
+
+create policy "Members can view github repo selection"
+  on github_connections for select
+  using (
+    exists (
+      select 1 from project_members
+      where project_members.project_id = github_connections.project_id
+        and project_members.user_id = auth.uid()
+        and project_members.status = 'accepted'
     )
   );
 
@@ -225,6 +250,34 @@ create policy "Members can view fix suggestions"
         and pm.status = 'accepted'
     )
   );
+
+-- ============================================================
+-- MIGRATION: Per-project → per-user GitHub connections
+-- Run this if you have an existing deployment with the old schema
+-- ============================================================
+-- -- 1. Create the new user-level table
+-- create table if not exists github_user_connections (
+--   id uuid primary key default gen_random_uuid(),
+--   user_id uuid references auth.users(id) on delete cascade not null unique,
+--   access_token text not null,
+--   github_username text not null default '',
+--   created_at timestamptz not null default now()
+-- );
+-- alter table github_user_connections enable row level security;
+-- create policy "Users can manage own github connection"
+--   on github_user_connections for all using (auth.uid() = user_id);
+--
+-- -- 2. Migrate tokens from old per-project rows to the new table
+-- insert into github_user_connections (user_id, access_token, created_at)
+-- select distinct on (p.user_id) p.user_id, gc.access_token, gc.created_at
+-- from github_connections gc
+-- join projects p on gc.project_id = p.id
+-- where gc.access_token is not null
+-- order by p.user_id, gc.created_at desc
+-- on conflict (user_id) do nothing;
+--
+-- -- 3. Drop access_token from github_connections
+-- alter table github_connections drop column if exists access_token;
 
 -- ============================================================
 -- FUTURE: Usage tracking table (for plan gating — not active)

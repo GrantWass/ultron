@@ -39,7 +39,13 @@ export async function GET() {
     ...(shared ?? []).filter((p) => !ownedIds.has(p.id)).map((p) => ({ ...p, is_owner: false })),
   ]
 
-  return NextResponse.json(allProjects)
+  const allProjectIds = allProjects.map((p) => p.id)
+  const { data: connections } = allProjectIds.length
+    ? await supabase.from('github_connections').select('project_id').in('project_id', allProjectIds)
+    : { data: [] }
+  const connectedIds = new Set((connections ?? []).map((c) => c.project_id))
+
+  return NextResponse.json(allProjects.map((p) => ({ ...p, has_github_connection: connectedIds.has(p.id) })))
 }
 
 export async function POST(request: Request) {

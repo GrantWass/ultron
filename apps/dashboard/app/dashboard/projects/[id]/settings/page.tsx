@@ -3,10 +3,9 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
-import type { GithubConnection } from '@ultron/types'
 import type { ProjectMember } from '@ultron/types'
 import {
-  Github, Check, ExternalLink, Code2, Users, Trash2, Mail,
+  Github, Check, Code2, Users, Trash2, Mail,
   Search, Lock, RefreshCw, Settings,
 } from 'lucide-react'
 
@@ -15,13 +14,14 @@ import {
 interface GitHubSectionProps {
   projectId: string
   searchParams: ReturnType<typeof useSearchParams>
+  isOwner: boolean | null
 }
 
-function GitHubSection({ projectId, searchParams }: GitHubSectionProps) {
+function GitHubSection({ projectId, searchParams, isOwner }: GitHubSectionProps) {
   const githubConnected = searchParams.get('github_connected')
   const githubError = searchParams.get('error')
 
-  const [connection, setConnection] = useState<GithubConnection | null>(null)
+  const [connection, setConnection] = useState<{ user_connected: boolean; repo_owner?: string | null; repo_name?: string | null } | null>(null)
   const [connLoading, setConnLoading] = useState(true)
   const [repoOwner, setRepoOwner] = useState('')
   const [repoName, setRepoName] = useState('')
@@ -35,27 +35,26 @@ function GitHubSection({ projectId, searchParams }: GitHubSectionProps) {
     fetch(`/api/github/connection?project_id=${projectId}`)
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
-        if (data) {
-          setConnection(data)
-          setRepoOwner(data.repo_owner ?? '')
-          setRepoName(data.repo_name ?? '')
-          setEditingRepo(!(data.repo_owner && data.repo_name))
-        } else {
-          setConnection(null)
+        setConnection(data)
+        if (data?.user_connected && data.repo_owner && data.repo_name) {
+          setRepoOwner(data.repo_owner)
+          setRepoName(data.repo_name)
           setEditingRepo(false)
+        } else if (data?.user_connected) {
+          setEditingRepo(true)
         }
         setConnLoading(false)
       })
   }, [projectId])
 
   useEffect(() => {
-    if (!connection) return
+    if (!connection?.user_connected || isOwner === false) return
     setReposLoading(true)
     fetch(`/api/github/repos?project_id=${projectId}`)
       .then((r) => r.ok ? r.json() : [])
       .then((data) => { setRepos(data); setReposLoading(false) })
       .catch(() => setReposLoading(false))
-  }, [projectId, connection])
+  }, [projectId, connection, isOwner])
 
   async function saveRepo(e: React.FormEvent) {
     e.preventDefault()
@@ -108,6 +107,14 @@ function GitHubSection({ projectId, searchParams }: GitHubSectionProps) {
           <div className="flex items-center gap-2 text-sm text-green-700">
             <Check className="h-4 w-4" />
             Connected
+            {isOwner === false && (
+              <span
+                title="Only the project owner can manage the GitHub connection"
+                className="ml-1 text-xs text-muted-foreground cursor-help"
+              >
+                (read-only)
+              </span>
+            )}
           </div>
 
           {!editingRepo && connection?.repo_owner && connection?.repo_name ? (
@@ -116,24 +123,26 @@ function GitHubSection({ projectId, searchParams }: GitHubSectionProps) {
                 <Code2 className="h-4 w-4 text-muted-foreground shrink-0" />
                 <span>{connection.repo_owner}/{connection.repo_name}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setEditingRepo(true)}
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Change
-                </button>
-                <button
-                  type="button"
-                  onClick={disconnectGitHub}
-                  className="text-xs text-destructive hover:text-destructive/80 transition-colors"
-                >
-                  Disconnect
-                </button>
-              </div>
+              {isOwner !== false && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingRepo(true)}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Change
+                  </button>
+                  <button
+                    type="button"
+                    onClick={disconnectGitHub}
+                    className="text-xs text-destructive hover:text-destructive/80 transition-colors"
+                  >
+                    Disconnect
+                  </button>
+                </div>
+              )}
             </div>
-          ) : (
+          ) : isOwner === false ? null : (
             <form onSubmit={saveRepo} className="space-y-3">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
@@ -228,6 +237,13 @@ function GitHubSection({ projectId, searchParams }: GitHubSectionProps) {
             </form>
           )}
         </div>
+      ) : isOwner === false ? (
+        <p
+          className="text-sm text-muted-foreground cursor-help"
+          title="Only the project owner can connect a GitHub repository"
+        >
+          No GitHub repository connected.
+        </p>
       ) : (
         <a
           href={`/api/github/connect?project_id=${projectId}`}
@@ -380,7 +396,7 @@ function ProjectSettingsContent({ projectId }: { projectId: string }) {
 
       {isOwner && <TeamSection projectId={projectId} />}
 
-      <GitHubSection projectId={projectId} searchParams={searchParams} />
+      <GitHubSection projectId={projectId} searchParams={searchParams} isOwner={isOwner} />
     </div>
   )
 }

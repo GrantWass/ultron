@@ -3,8 +3,8 @@ import type { RelevantFile } from '@ultron/types'
 
 const GITHUB_API = 'https://api.github.com'
 
-export function getGitHubOAuthUrl(projectId: string, csrfToken: string): string {
-  const state = Buffer.from(`${projectId}:${csrfToken}`).toString('base64url')
+export function getGitHubOAuthUrl(csrfToken: string): string {
+  const state = Buffer.from(csrfToken).toString('base64url')
   const params = new URLSearchParams({
     client_id: process.env.GITHUB_CLIENT_ID!,
     redirect_uri: process.env.GITHUB_REDIRECT_URI!,
@@ -14,15 +14,9 @@ export function getGitHubOAuthUrl(projectId: string, csrfToken: string): string 
   return `https://github.com/login/oauth/authorize?${params}`
 }
 
-export function parseOAuthState(state: string): { projectId: string; csrfToken: string } | null {
+export function parseOAuthState(state: string): { csrfToken: string } | null {
   try {
-    const decoded = Buffer.from(state, 'base64url').toString('utf8')
-    const colonIdx = decoded.indexOf(':')
-    if (colonIdx === -1) return null
-    return {
-      projectId: decoded.slice(0, colonIdx),
-      csrfToken: decoded.slice(colonIdx + 1),
-    }
+    return { csrfToken: Buffer.from(state, 'base64url').toString('utf8') }
   } catch {
     return null
   }

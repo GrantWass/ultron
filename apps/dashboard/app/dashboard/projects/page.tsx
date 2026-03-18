@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import type { Project } from '@ultron/types'
 import { formatDate } from '@/lib/utils'
-import { Plus, Trash2, Key, AlertCircle } from 'lucide-react'
+import { Plus, Trash2, Key, AlertCircle, GitBranch, UserCheck } from 'lucide-react'
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([])
@@ -116,44 +116,70 @@ export default function ProjectsPage() {
           <p className="text-muted-foreground">No projects yet. Create one to get started.</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {projects.map((project) => (
-            <div
-              key={project.id}
-              className="rounded-md border border-border p-4 flex items-start justify-between gap-4"
-            >
-              <div className="flex-1 min-w-0">
-                <Link
-                  href={`/dashboard/projects/${project.id}`}
-                  className="font-medium hover:text-primary transition-colors"
-                >
-                  {project.name}
-                </Link>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Created {formatDate(project.created_at)}
-                </p>
-                <div className="flex items-center gap-2 mt-2">
-                  <Key className="h-3 w-3 text-muted-foreground" />
-                  <code className="text-xs font-mono text-muted-foreground">
-                    {project.api_key}
-                  </code>
-                  <button
-                    onClick={() => copyKey(project.api_key)}
-                    className="text-xs text-primary hover:underline"
-                  >
-                    {copiedKey === project.api_key ? 'Copied!' : 'Copy'}
+        <div className="space-y-6">
+          {/* Owned projects */}
+          {projects.some((p: any) => p.is_owner !== false) && (
+            <div className="space-y-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">My Projects</p>
+              {projects.filter((p: any) => p.is_owner !== false).map((project: any) => (
+                <div key={project.id} className="rounded-md border border-border p-4 flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Link href={`/dashboard/projects/${project.id}`} className="font-medium hover:text-primary transition-colors">
+                        {project.name}
+                      </Link>
+                      {project.has_github_connection && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 text-[10px] font-medium text-green-700 dark:text-green-400">
+                          <GitBranch className="h-2.5 w-2.5" />
+                          GitHub
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">Created {formatDate(project.created_at)}</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <Key className="h-3 w-3 text-muted-foreground" />
+                      <code className="text-xs font-mono text-muted-foreground">{project.api_key}</code>
+                      <button onClick={() => copyKey(project.api_key)} className="text-xs text-primary hover:underline">
+                        {copiedKey === project.api_key ? 'Copied!' : 'Copy'}
+                      </button>
+                    </div>
+                  </div>
+                  <button onClick={() => handleDelete(project.id, project.name)} className="text-muted-foreground hover:text-destructive transition-colors p-1 rounded" title="Delete project">
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
-              </div>
-              <button
-                onClick={() => handleDelete(project.id, project.name)}
-                className="text-muted-foreground hover:text-destructive transition-colors p-1 rounded"
-                title="Delete project"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              ))}
             </div>
-          ))}
+          )}
+
+          {/* Shared projects */}
+          {projects.some((p: any) => p.is_owner === false) && (
+            <div className="space-y-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Shared with me</p>
+              {projects.filter((p: any) => p.is_owner === false).map((project: any) => (
+                <div key={project.id} className="rounded-md border border-border p-4 flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Link href={`/dashboard/projects/${project.id}`} className="font-medium hover:text-primary transition-colors">
+                        {project.name}
+                      </Link>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 dark:bg-blue-900/30 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-400">
+                        <UserCheck className="h-2.5 w-2.5" />
+                        Collaborator
+                      </span>
+                      {project.has_github_connection && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 text-[10px] font-medium text-green-700 dark:text-green-400">
+                          <GitBranch className="h-2.5 w-2.5" />
+                          GitHub
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">Created {formatDate(project.created_at)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

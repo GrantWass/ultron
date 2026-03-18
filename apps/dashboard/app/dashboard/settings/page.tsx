@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { Project, GithubConnection } from '@ultron/types'
+import type { Project } from '@ultron/types'
 import {
   Key, Github, Copy, Check, ExternalLink, Code2, ChevronDown, LogOut,
 } from 'lucide-react'
@@ -169,13 +169,16 @@ function SettingsContent() {
   const supabase = createClient()
 
   const projectIdParam = searchParams.get('project_id')
+  const githubConnected = searchParams.get('github_connected')
+  const githubError = searchParams.get('error')
 
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState<string>(projectIdParam ?? '')
-  const [connection, setConnection] = useState<GithubConnection | null>(null)
-  const [connLoading, setConnLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [copiedKey, setCopiedKey] = useState(false)
+  const [ghLoading, setGhLoading] = useState(true)
+  const [ghConnected, setGhConnected] = useState(false)
+  const [ghUsername, setGhUsername] = useState('')
 
   useEffect(() => {
     fetch('/api/projects')
@@ -190,15 +193,14 @@ function SettingsContent() {
   }, [])
 
   useEffect(() => {
-    if (!selectedProjectId) return
-    setConnLoading(true)
-    fetch(`/api/github/connection?project_id=${selectedProjectId}`)
-      .then((r) => r.ok ? r.json() : null)
+    fetch('/api/github/user-connection')
+      .then((r) => r.ok ? r.json() : { connected: false })
       .then((data) => {
-        setConnection(data)
-        setConnLoading(false)
+        setGhConnected(data.connected)
+        setGhUsername(data.github_username ?? '')
+        setGhLoading(false)
       })
-  }, [selectedProjectId])
+  }, [])
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId)
 
@@ -210,9 +212,10 @@ function SettingsContent() {
   }
 
   async function disconnectGitHub() {
-    if (!selectedProjectId || !confirm('Disconnect GitHub?')) return
-    await fetch(`/api/github/connection?project_id=${selectedProjectId}`, { method: 'DELETE' })
-    setConnection(null)
+    if (!confirm('Disconnect GitHub? This will remove your connection but keep project repo selections.')) return
+    await fetch('/api/github/user-connection', { method: 'DELETE' })
+    setGhConnected(false)
+    setGhUsername('')
   }
 
   async function handleSignOut() {
@@ -273,55 +276,50 @@ function SettingsContent() {
       )}
 
       {/* GitHub Connection */}
-      {selectedProjectId && (
-        <div className="space-y-3">
-          <h2 className="text-sm font-semibold flex items-center gap-2">
-            <Github className="h-4 w-4" />
-            GitHub Connection
-          </h2>
-          <p className="text-xs text-muted-foreground">
-            Connect GitHub to allow Claude to fetch source files for better fix suggestions.
-            Repo selection is available in{' '}
-            <a
-              href={`/dashboard/projects/${selectedProjectId}/settings`}
-              className="underline underline-offset-2 hover:text-foreground transition-colors"
-            >
-              project settings
-            </a>.
-          </p>
-
-          {connLoading ? (
-            <p className="text-sm text-muted-foreground">Loading…</p>
-          ) : connection ? (
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-sm text-green-700">
-                <Check className="h-4 w-4" />
-                Connected
-                {connection.repo_owner && connection.repo_name && (
-                  <span className="text-muted-foreground">
-                    — {connection.repo_owner}/{connection.repo_name}
-                  </span>
-                )}
-              </div>
-              <button
-                onClick={disconnectGitHub}
-                className="text-xs text-destructive hover:text-destructive/80 transition-colors"
-              >
-                Disconnect
-              </button>
+      <div className="space-y-3">
+        <h2 className="text-sm font-semibold flex items-center gap-2">
+          <Github className="h-4 w-4" />
+          GitHub Connection
+        </h2>
+        <p className="text-xs text-muted-foreground">
+          Connect GitHub once — then select a repository per project in Project Settings.
+        </p>
+        {githubConnected && (
+          <div className="rounded-md bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-300">
+            GitHub connected successfully!
+          </div>
+        )}
+        {githubError && (
+          <div className="rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800">
+            GitHub connection failed: {githubError.replace(/_/g, ' ')}
+          </div>
+        )}
+        {ghLoading ? (
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : ghConnected ? (
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
+              <Check className="h-4 w-4" />
+              Connected{ghUsername ? ` as ${ghUsername}` : ''}
             </div>
-          ) : (
-            <a
-              href={`/api/github/connect?project_id=${selectedProjectId}`}
-              className="inline-flex items-center gap-2 rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:bg-foreground/90 transition-colors"
+            <button
+              onClick={disconnectGitHub}
+              className="text-xs text-destructive hover:text-destructive/80 transition-colors"
             >
-              <Github className="h-4 w-4" />
-              Connect GitHub
-              <ExternalLink className="h-3 w-3" />
-            </a>
-          )}
-        </div>
-      )}
+              Disconnect
+            </button>
+          </div>
+        ) : (
+          <a
+            href="/api/github/connect"
+            className="inline-flex items-center gap-2 rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background hover:bg-foreground/90 transition-colors"
+          >
+            <Github className="h-4 w-4" />
+            Connect GitHub
+            <ExternalLink className="h-3 w-3" />
+          </a>
+        )}
+      </div>
 
       {/* Sign out */}
       <div className="border-t border-border pt-6">

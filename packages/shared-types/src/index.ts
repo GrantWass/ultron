@@ -42,12 +42,19 @@ export interface ProjectMember {
   accepted_at: string | null
 }
 
+export interface GithubUserConnection {
+  id: string
+  user_id: string
+  github_username: string
+  created_at: string
+}
+
+// Updated (no access_token)
 export interface GithubConnection {
   id: string
   project_id: string
   repo_owner: string
   repo_name: string
-  access_token: string
   created_at: string
 }
 

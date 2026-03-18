@@ -21,7 +21,6 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/dashboard/settings?error=invalid_callback`)
   }
 
-  // Validate CSRF token
   const cookieStore = await cookies()
   const storedCsrf = cookieStore.get('github_oauth_csrf')?.value
   if (!storedCsrf) {
@@ -30,66 +29,48 @@ export async function GET(request: Request) {
 
   const parsed = parseOAuthState(state)
   if (!parsed || parsed.csrfToken !== storedCsrf) {
-    return NextResponse.redirect(`${origin}/dashboard/projects/${parsed?.projectId ?? ''}/settings?error=csrf_invalid`)
+    return NextResponse.redirect(`${origin}/dashboard/settings?error=csrf_invalid`)
   }
 
-  // Clear CSRF cookie
   cookieStore.delete('github_oauth_csrf')
 
-  // Verify session and project ownership
   const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return NextResponse.redirect(`${origin}/login`)
-  }
+  if (!user) return NextResponse.redirect(`${origin}/login`)
 
-  const { data: project } = await supabase
-    .from('projects')
-    .select('id')
-    .eq('id', parsed.projectId)
-    .eq('user_id', user.id)
-    .single()
-
-  if (!project) {
-    return NextResponse.redirect(`${origin}/dashboard/projects/${parsed.projectId}/settings?error=project_not_found`)
-  }
-
-  // Exchange code for access token
   let accessToken: string
   try {
     accessToken = await exchangeCodeForToken(code)
   } catch (err) {
     console.error('GitHub token exchange error:', err)
-    return NextResponse.redirect(`${origin}/dashboard/projects/${parsed.projectId}/settings?error=token_exchange_failed`)
+    return NextResponse.redirect(`${origin}/dashboard/settings?error=token_exchange_failed`)
   }
 
-  // Get repo info from GitHub
-  const userResponse = await fetch('https://api.github.com/user/repos?sort=updated&per_page=1', {
-    headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/vnd.github.v3+json' },
-  })
+  // Fetch GitHub username
+  let githubUsername = ''
+  try {
+    const res = await fetch('https://api.github.com/user', {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/vnd.github.v3+json' },
+    })
+    if (res.ok) {
+      const data = await res.json() as { login?: string }
+      githubUsername = data.login ?? ''
+    }
+  } catch { /* non-fatal */ }
 
-  // We'll store without repo info initially — user can pick in settings
   const encryptedToken = encrypt(accessToken)
 
-  // Upsert GitHub connection
   const { error: upsertError } = await supabase
-    .from('github_connections')
+    .from('github_user_connections')
     .upsert(
-      {
-        project_id: parsed.projectId,
-        repo_owner: '',
-        repo_name: '',
-        access_token: encryptedToken,
-      },
-      { onConflict: 'project_id' }
+      { user_id: user.id, access_token: encryptedToken, github_username: githubUsername },
+      { onConflict: 'user_id' }
     )
 
   if (upsertError) {
-    console.error('GitHub connection upsert error:', upsertError)
-    return NextResponse.redirect(`${origin}/dashboard/projects/${parsed.projectId}/settings?error=save_failed`)
+    console.error('GitHub user connection upsert error:', upsertError)
+    return NextResponse.redirect(`${origin}/dashboard/settings?error=save_failed`)
   }
 
-  return NextResponse.redirect(
-    `${origin}/dashboard/projects/${parsed.projectId}/settings?github_connected=true`
-  )
+  return NextResponse.redirect(`${origin}/dashboard/settings?github_connected=true`)
 }

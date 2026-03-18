@@ -82,8 +82,7 @@ export async function POST(request: Request) {
         user_id,
         github_connections(
           repo_owner,
-          repo_name,
-          access_token
+          repo_name
         )
       )
     `)
@@ -138,73 +137,51 @@ export async function POST(request: Request) {
     })
   }
 
-  // Fetch GitHub files if connection exists
-  let files: RelevantFile[] = []
+  // Get GitHub token from project owner's user connection
+  const projectOwnerId = (error as any).projects?.user_id
   const rawConn = (error as any).projects?.github_connections
   const githubConn = Array.isArray(rawConn) ? rawConn[0] : rawConn
 
-  // TODO: delete
-  console.log('[fix] Raw projects data:', JSON.stringify((error as any).projects, null, 2))
-  // TODO: delete
-  console.log('[fix] GitHub connection present:', !!githubConn)
-  // TODO: delete
-  console.log('[fix] GitHub connection details:', {
-    hasToken: !!githubConn?.access_token,
-    repo_owner: githubConn?.repo_owner ?? null,
-    repo_name: githubConn?.repo_name ?? null,
-  })
+  let accessToken: string | null = null
+  if (githubConn?.repo_owner && githubConn?.repo_name && projectOwnerId) {
+    const { data: userConn } = await service
+      .from('github_user_connections')
+      .select('access_token')
+      .eq('user_id', projectOwnerId)
+      .single()
+    if (userConn) accessToken = userConn.access_token
+  }
 
-  if (githubConn?.access_token && githubConn.repo_owner && githubConn.repo_name) {
+  // Fetch GitHub files if connection exists
+  let files: RelevantFile[] = []
+
+  if (accessToken && githubConn?.repo_owner && githubConn?.repo_name) {
     const filePaths = parseStackTrace(error.stack_trace ?? '')
-    // TODO: delete
-    console.log('[fix] Parsed file paths from stack trace:', filePaths)
     if (filePaths.length > 0) {
       try {
         files = await fetchGitHubFiles(
-          githubConn.access_token,
+          accessToken,
           githubConn.repo_owner,
           githubConn.repo_name,
           filePaths
         )
-        // TODO: delete
-        console.log('[fix] Files fetched from GitHub:', files.map((f) => ({
-          path: f.path,
-          chars: f.content.length,
-          preview: f.content.slice(0, 300),
-        })))
       } catch (err) {
         console.error('Failed to fetch GitHub files:', err)
       }
     } else {
-      // TODO: delete
-      console.log('[fix] No file paths from stack trace — falling back to keyword search')
       try {
         const keywords = extractSearchKeywords(error.message ?? '', error.stack_trace ?? '')
-        // TODO: delete
-        console.log('[fix] Keyword search terms:', keywords)
         files = await searchAndFetchGitHubFiles(
-          githubConn.access_token,
+          accessToken,
           githubConn.repo_owner,
           githubConn.repo_name,
           keywords,
         )
-        // TODO: delete
-        console.log('[fix] Files from keyword search:', files.map((f) => ({
-          path: f.path,
-          chars: f.content.length,
-          preview: f.content.slice(0, 300),
-        })))
       } catch (err) {
         console.error('Failed to search GitHub files:', err)
       }
     }
-  } else {
-    // TODO: delete
-    console.log('[fix] Skipping GitHub fetch — missing token, repo owner, or repo name')
   }
-
-  // TODO: delete
-  console.log('[fix] Total files passed to model:', files.length)
 
   const prompt = buildPrompt(error as ErrorRecord, files)
 
