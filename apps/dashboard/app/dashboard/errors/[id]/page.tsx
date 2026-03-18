@@ -267,11 +267,13 @@ export default async function ErrorDetailPage({
               {err.message}
             </h1>
           </div>
-          <ResolveButton
-            projectId={err.project_id}
-            message={err.message}
-            eventType={eventType}
-          />
+          <div className="shrink-0 self-start">
+            <ResolveButton
+              projectId={err.project_id}
+              message={err.message}
+              eventType={eventType}
+            />
+          </div>
         </div>
         <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
           {err.browser && <span>Browser: {err.browser}</span>}

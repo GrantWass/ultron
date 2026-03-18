@@ -6,7 +6,7 @@ import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Project } from '@ultron/types'
 import {
-  Key, Github, Copy, Check, ExternalLink, Code2, ChevronDown, LogOut,
+  Key, Github, Copy, Check, ExternalLink, Code2, ChevronDown, LogOut, BookOpen,
 } from 'lucide-react'
 
 // ── SDK Setup ─────────────────────────────────────────────────────────────────
@@ -314,6 +314,81 @@ function SettingsContent() {
             <ExternalLink className="h-3 w-3" />
           </a>
         )}
+      </div>
+
+      {/* Best Practices */}
+      <div className="space-y-3">
+        <h2 className="text-sm font-semibold flex items-center gap-2">
+          <BookOpen className="h-4 w-4" />
+          Best Practices
+        </h2>
+        <div className="space-y-3 text-sm">
+
+          {/* Timing-Allow-Origin */}
+          <div className="rounded-md border border-border overflow-hidden">
+            <div className="px-4 py-2 border-b border-border bg-muted/50 flex items-center justify-between">
+              <span className="font-medium text-xs">Enable detailed timing breakdowns</span>
+              <span className="text-[11px] font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded">Timing-Allow-Origin</span>
+            </div>
+            <div className="px-4 py-3 space-y-2 text-xs text-muted-foreground">
+              <p>By default, browsers hide DNS/TCP/TLS/TTFB timing for cross-origin requests. Add this response header on your API servers to unlock full breakdowns:</p>
+              <pre className="bg-muted rounded px-3 py-2 font-mono text-foreground/80 overflow-x-auto">Timing-Allow-Origin: https://your-app.com</pre>
+              <p>Or to allow all origins (acceptable for public APIs):</p>
+              <pre className="bg-muted rounded px-3 py-2 font-mono text-foreground/80 overflow-x-auto">Timing-Allow-Origin: *</pre>
+            </div>
+          </div>
+
+          {/* Slow request threshold */}
+          <div className="rounded-md border border-border overflow-hidden">
+            <div className="px-4 py-2 border-b border-border bg-muted/50 flex items-center justify-between">
+              <span className="font-medium text-xs">Tune the slow request threshold</span>
+              <span className="text-[11px] font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded">slowRequestThreshold</span>
+            </div>
+            <div className="px-4 py-3 space-y-2 text-xs text-muted-foreground">
+              <p>The default threshold is <span className="font-mono text-foreground/80">3000ms</span>. Adjust it to match your app&apos;s SLAs:</p>
+              <pre className="bg-muted rounded px-3 py-2 font-mono text-foreground/80 overflow-x-auto">{`initTracker({
+  apiKey: '...',
+  slowRequestThreshold: 1000, // flag anything over 1s
+})`}</pre>
+            </div>
+          </div>
+
+          {/* reportAllVitals */}
+          <div className="rounded-md border border-border overflow-hidden">
+            <div className="px-4 py-2 border-b border-border bg-muted/50 flex items-center justify-between">
+              <span className="font-medium text-xs">Report all Web Vitals (not just poor ones)</span>
+              <span className="text-[11px] font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded">reportAllVitals</span>
+            </div>
+            <div className="px-4 py-3 space-y-2 text-xs text-muted-foreground">
+              <p>By default, only <span className="font-mono text-foreground/80">needs-improvement</span> and <span className="font-mono text-foreground/80">poor</span> vitals are reported to reduce noise. Enable this to capture all vitals including good scores:</p>
+              <pre className="bg-muted rounded px-3 py-2 font-mono text-foreground/80 overflow-x-auto">{`initTracker({
+  apiKey: '...',
+  reportAllVitals: true,
+})`}</pre>
+            </div>
+          </div>
+
+          {/* GitHub repo connection */}
+          <div className="rounded-md border border-border overflow-hidden">
+            <div className="px-4 py-2 border-b border-border bg-muted/50">
+              <span className="font-medium text-xs">Connect a GitHub repo for better AI fixes</span>
+            </div>
+            <div className="px-4 py-3 text-xs text-muted-foreground">
+              <p>When a repo is connected in Project Settings, the AI fix tool fetches relevant source files from your stack trace before generating suggestions — significantly improving accuracy compared to stack-trace-only analysis.</p>
+            </div>
+          </div>
+
+          {/* Source maps */}
+          <div className="rounded-md border border-border overflow-hidden">
+            <div className="px-4 py-2 border-b border-border bg-muted/50">
+              <span className="font-medium text-xs">Keep source maps readable</span>
+            </div>
+            <div className="px-4 py-3 text-xs text-muted-foreground">
+              <p>Stack traces are more actionable when they reference original source files. If you minify your production bundle, ensure source maps are either publicly accessible or that your build preserves meaningful function names via <span className="font-mono text-foreground/80">terser</span> or similar.</p>
+            </div>
+          </div>
+
+        </div>
       </div>
 
       {/* Sign out */}

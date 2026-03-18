@@ -136,6 +136,7 @@ function isCorsError(reqUrl: string, errStr: string): boolean {
 }
 
 function shouldIgnore(reqUrl: string): boolean {
+  if (!reqUrl || reqUrl === 'null' || reqUrl === 'undefined') return true
   return reqUrl.includes('ultron.live/api/ingest')
 }
 
@@ -188,7 +189,7 @@ export function monitorNetwork(queue: ErrorQueue, config: TrackerConfig): void {
                 response_body_size: bodyResult?.size ?? null,
                 timing: getTimingBreakdown(reqUrl),
                 page: window.location.pathname,
-                referrer: document.referrer || null,
+                referrer: document.referrer || window.location.href,
               }
             )
           )
@@ -218,7 +219,7 @@ export function monitorNetwork(queue: ErrorQueue, config: TrackerConfig): void {
             response_body: null,
             timing: null,
             page: window.location.pathname,
-            referrer: document.referrer || null,
+            referrer: document.referrer || window.location.href,
           }
         )
       )
@@ -283,7 +284,7 @@ export function monitorNetwork(queue: ErrorQueue, config: TrackerConfig): void {
                 response_body_size: responseBodySize,
                 timing: getTimingBreakdown(reqUrl),
                 page: window.location.pathname,
-                referrer: document.referrer || null,
+                referrer: document.referrer || window.location.href,
               }
             )
           )

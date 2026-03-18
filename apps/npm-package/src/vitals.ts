@@ -36,7 +36,7 @@ function makePayload(
   const ua = navigator.userAgent
   return {
     event_type: 'vital',
-    message: `${name} ${Math.round(value)}${name === 'CLS' ? '' : 'ms'} (${rating})`,
+    message: `${name} ${name === 'CLS' ? value.toFixed(3) : Math.round(value) + 'ms'} (${rating})`,
     stack: '',
     url: window.location.href,
     browser: getBrowser(ua),
@@ -133,18 +133,37 @@ export function collectVitals(queue: ErrorQueue, config: TrackerConfig): void {
   // ── INP (Interaction to Next Paint) ───────────────────────────────────────
   try {
     let maxInp = 0
+    let inpExtra: Record<string, unknown> = {}
     const inpObs = new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {
-        const e = entry as PerformanceEntry & { duration: number }
-        if (e.duration > maxInp) maxInp = e.duration
+        const e = entry as PerformanceEntry & {
+          duration: number
+          name: string
+          target?: Element
+          processingStart?: number
+          processingEnd?: number
+        }
+        if (e.duration > maxInp) {
+          maxInp = e.duration
+          const el = e.target
+          inpExtra = {
+            eventType: e.name || null,
+            element: el
+              ? [el.tagName.toLowerCase(), el.id ? `#${el.id}` : '', el.className ? `.${String(el.className).trim().split(/\s+/).join('.')}` : ''].join('') || el.tagName.toLowerCase()
+              : null,
+            inputDelay: e.processingStart != null ? Math.round(e.processingStart - entry.startTime) : null,
+            processingTime: (e.processingStart != null && e.processingEnd != null)
+              ? Math.round(e.processingEnd - e.processingStart) : null,
+          }
+        }
       }
     })
-    // durationThreshold is not in all TS DOM typings yet — cast to any
-    inpObs.observe({ type: 'event', buffered: true } as PerformanceObserverInit)
+    // durationThreshold: 40ms filter to avoid noise; not in all TS DOM typings yet — cast to any
+    inpObs.observe({ type: 'event', buffered: true, durationThreshold: 40 } as PerformanceObserverInit)
 
     addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden' && maxInp > 0) {
-        report('INP', maxInp)
+        report('INP', maxInp, inpExtra)
         inpObs.disconnect()
       }
     }, { once: true })
