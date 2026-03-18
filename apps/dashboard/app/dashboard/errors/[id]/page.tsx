@@ -321,6 +321,7 @@ export default async function ErrorDetailPage({
           <div className="p-4">
             <FixSuggestion
               errorId={id}
+              projectId={projectId}
               existingSuggestion={suggestion?.suggestion ?? null}
               githubRepo={githubConn?.repo_owner && githubConn?.repo_name
                 ? `${githubConn.repo_owner}/${githubConn.repo_name}`

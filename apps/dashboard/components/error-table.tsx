@@ -466,84 +466,53 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
         </div>
       )}
 
-      {/* ── Table ─────────────────────────────────────────────────────────── */}
-      <div className="rounded-lg border border-border overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border bg-muted/40">
-              <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground w-24">Type</th>
-              <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Message</th>
-              <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground hidden md:table-cell">Page</th>
-              <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground hidden lg:table-cell">Browser</th>
-              <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground whitespace-nowrap">When</th>
-              <th className="w-10" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border/60">
-            {loading ? (
-              <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground text-sm">
-                  <RefreshCw className="h-4 w-4 animate-spin mx-auto mb-2 text-muted-foreground/50" />
-                  Loading…
-                </td>
-              </tr>
-            ) : errors.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-4 py-14 text-center">
-                  <AlertCircle className="h-7 w-7 text-muted-foreground/30 mx-auto mb-2" />
-                  <p className="text-muted-foreground text-sm mb-1">
-                    {hasAnyFilter ? 'No events match your filters' : 'No events yet'}
-                  </p>
-                  {hasAnyFilter ? (
-                    <button onClick={clearAllFilters} className="text-xs text-primary hover:underline">
-                      Clear all filters
-                    </button>
-                  ) : (
-                    <p className="text-xs text-muted-foreground/50">Install the SDK and events will appear here</p>
-                  )}
-                </td>
-              </tr>
+      {/* ── List ──────────────────────────────────────────────────────────── */}
+      <div className="rounded-lg border border-border overflow-hidden divide-y divide-border/60">
+        {loading ? (
+          <div className="px-4 py-10 text-center text-muted-foreground text-sm">
+            <RefreshCw className="h-4 w-4 animate-spin mx-auto mb-2 text-muted-foreground/50" />
+            Loading…
+          </div>
+        ) : errors.length === 0 ? (
+          <div className="px-4 py-14 text-center">
+            <AlertCircle className="h-7 w-7 text-muted-foreground/30 mx-auto mb-2" />
+            <p className="text-muted-foreground text-sm mb-1">
+              {hasAnyFilter ? 'No events match your filters' : 'No events yet'}
+            </p>
+            {hasAnyFilter ? (
+              <button onClick={clearAllFilters} className="text-xs text-primary hover:underline">
+                Clear all filters
+              </button>
             ) : (
-              errors.map((error) => (
-                <tr
-                  key={error.id}
-                  className="group hover:bg-muted/20 transition-colors"
-                >
-                  <td className="px-4 py-3">
-                    <EventTypeBadge type={error.event_type ?? 'error'} />
-                  </td>
-                  <td className="px-4 py-3 max-w-0">
-                    <Link href={`/dashboard/errors/${error.id}`} className="block hover:text-primary transition-colors">
-                      <span className="font-mono text-xs text-foreground/80 line-clamp-2">
-                        {error.message}
-                      </span>
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 hidden md:table-cell">
-                    <span className="text-muted-foreground text-xs font-mono">
-                      {error.url ? truncate(new URL(error.url).pathname, 36) : '—'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 hidden lg:table-cell">
-                    <span className="text-muted-foreground text-xs">{error.browser ?? '—'}</span>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span className="text-muted-foreground text-xs">{formatRelativeTime(error.created_at)}</span>
-                  </td>
-                  <td className="px-3 py-3">
-                    <button
-                      onClick={() => setResolveTarget(error)}
-                      title="Resolve — delete all errors with this message"
-                      className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                    >
-                      <CheckCircle className="h-3.5 w-3.5" />
-                    </button>
-                  </td>
-                </tr>
-              ))
+              <p className="text-xs text-muted-foreground/50">Install the SDK and events will appear here</p>
             )}
-          </tbody>
-        </table>
+          </div>
+        ) : (
+          errors.map((error) => (
+            <div key={error.id} className="group flex items-start gap-2.5 px-4 py-2.5 hover:bg-muted/30 transition-colors">
+              <EventTypeBadge type={error.event_type ?? 'error'} />
+              <Link href={`/dashboard/errors/${error.id}`} className="min-w-0 flex-1 hover:text-primary transition-colors">
+                <p className="text-xs font-mono font-medium text-foreground/80 truncate">
+                  {error.message}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {[
+                    error.url && (() => { try { return new URL(error.url!).pathname } catch { return error.url } })(),
+                    error.browser,
+                    formatRelativeTime(error.created_at),
+                  ].filter(Boolean).join(' · ')}
+                </p>
+              </Link>
+              <button
+                onClick={(e) => { e.preventDefault(); setResolveTarget(error) }}
+                title="Resolve — delete all errors with this message"
+                className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive mt-0.5"
+              >
+                <CheckCircle className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))
+        )}
       </div>
 
       {/* ── Pagination ────────────────────────────────────────────────────── */}

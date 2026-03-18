@@ -235,22 +235,6 @@ function SettingsContent() {
         </p>
       </div>
 
-      {/* Project selector */}
-      {projects.length > 1 && (
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Project</label>
-          <select
-            value={selectedProjectId}
-            onChange={(e) => setSelectedProjectId(e.target.value)}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-        </div>
-      )}
-
       {/* API Key + SDK Setup */}
       {selectedProject && (
         <div className="space-y-3">
@@ -259,6 +243,17 @@ function SettingsContent() {
             API Key
           </h2>
           <div className="flex items-center gap-2">
+            {projects.length > 1 && (
+              <select
+                value={selectedProjectId}
+                onChange={(e) => setSelectedProjectId(e.target.value)}
+                className="shrink-0 rounded-md border border-input bg-background px-2 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            )}
             <code className="flex-1 min-w-0 rounded-md border border-input bg-muted px-3 py-2 text-sm font-mono truncate">
               {selectedProject.api_key}
             </code>
@@ -282,7 +277,7 @@ function SettingsContent() {
           GitHub Connection
         </h2>
         <p className="text-xs text-muted-foreground">
-          Connect GitHub once — then select a repository per project in Project Settings.
+          Connect GitHub — then select a repository per project in Project Settings.
         </p>
         {githubConnected && (
           <div className="rounded-md bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-300">

@@ -6,6 +6,7 @@ import { Wand2, Loader2, Github, Info, RefreshCw } from 'lucide-react'
 
 interface FixSuggestionProps {
   errorId: string
+  projectId: string
   existingSuggestion?: string | null
   githubRepo?: string | null
 }
@@ -222,7 +223,7 @@ function MarkdownRenderer({ text }: { text: string }) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function FixSuggestion({ errorId, existingSuggestion, githubRepo }: FixSuggestionProps) {
+export function FixSuggestion({ errorId, projectId, existingSuggestion, githubRepo }: FixSuggestionProps) {
   const [showFix, setShowFix] = useState(!!existingSuggestion)
 
   const { complete, completion, isLoading, error } = useCompletion({
@@ -267,8 +268,8 @@ export function FixSuggestion({ errorId, existingSuggestion, githubRepo }: FixSu
             <Info className="h-3.5 w-3.5 shrink-0" />
             <span>
               No GitHub repo connected — AI will infer from the stack trace only.{' '}
-              <a href="/dashboard/settings" className="underline hover:text-foreground transition-colors">
-                Connect in Settings.
+              <a href={`/dashboard/projects/${projectId}/settings`} className="underline hover:text-foreground transition-colors">
+                Connect in Project Settings.
               </a>
             </span>
           </div>
