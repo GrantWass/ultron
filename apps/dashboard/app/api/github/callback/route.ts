@@ -30,7 +30,7 @@ export async function GET(request: Request) {
 
   const parsed = parseOAuthState(state)
   if (!parsed || parsed.csrfToken !== storedCsrf) {
-    return NextResponse.redirect(`${origin}/dashboard/settings?error=csrf_invalid`)
+    return NextResponse.redirect(`${origin}/dashboard/projects/${parsed?.projectId ?? ''}/settings?error=csrf_invalid`)
   }
 
   // Clear CSRF cookie
@@ -51,7 +51,7 @@ export async function GET(request: Request) {
     .single()
 
   if (!project) {
-    return NextResponse.redirect(`${origin}/dashboard/settings?error=project_not_found`)
+    return NextResponse.redirect(`${origin}/dashboard/projects/${parsed.projectId}/settings?error=project_not_found`)
   }
 
   // Exchange code for access token
@@ -60,7 +60,7 @@ export async function GET(request: Request) {
     accessToken = await exchangeCodeForToken(code)
   } catch (err) {
     console.error('GitHub token exchange error:', err)
-    return NextResponse.redirect(`${origin}/dashboard/settings?error=token_exchange_failed`)
+    return NextResponse.redirect(`${origin}/dashboard/projects/${parsed.projectId}/settings?error=token_exchange_failed`)
   }
 
   // Get repo info from GitHub
@@ -86,10 +86,10 @@ export async function GET(request: Request) {
 
   if (upsertError) {
     console.error('GitHub connection upsert error:', upsertError)
-    return NextResponse.redirect(`${origin}/dashboard/settings?error=save_failed`)
+    return NextResponse.redirect(`${origin}/dashboard/projects/${parsed.projectId}/settings?error=save_failed`)
   }
 
   return NextResponse.redirect(
-    `${origin}/dashboard/settings?project_id=${parsed.projectId}&github_connected=true`
+    `${origin}/dashboard/projects/${parsed.projectId}/settings?github_connected=true`
   )
 }

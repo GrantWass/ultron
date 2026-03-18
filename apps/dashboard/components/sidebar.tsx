@@ -1,11 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import type { Project } from '@ultron/types'
-import { AlertCircle, FolderOpen, Settings, LogOut, Zap, Users, Mail } from 'lucide-react'
+import { AlertCircle, FolderOpen, Settings, Zap, Users, Mail, SlidersHorizontal } from 'lucide-react'
 
 interface PendingInvite {
   token: string
@@ -17,21 +16,25 @@ interface SidebarProps {
   projects: Project[]
   currentProjectId?: string
   pendingInvites?: PendingInvite[]
+  isOpen?: boolean
+  onClose?: () => void
 }
 
-export function Sidebar({ projects, currentProjectId, pendingInvites }: SidebarProps) {
+export function Sidebar({ projects, currentProjectId, pendingInvites, isOpen, onClose }: SidebarProps) {
   const pathname = usePathname()
-  const router = useRouter()
-  const supabase = createClient()
 
-  async function handleSignOut() {
-    await supabase.auth.signOut()
-    router.push('/login')
-    router.refresh()
-  }
+  // Derive current project id from URL if not passed explicitly
+  const projectIdMatch = pathname.match(/\/dashboard\/projects\/([^/]+)/)
+  const activeProjectId = currentProjectId ?? projectIdMatch?.[1]
 
   return (
-    <aside className="flex h-screen w-60 flex-col border-r border-border bg-card">
+    <aside
+      className={cn(
+        'fixed inset-y-0 left-0 z-50 flex h-screen w-60 flex-col border-r border-border bg-card transition-transform duration-200',
+        'md:relative md:z-auto md:translate-x-0',
+        isOpen ? 'translate-x-0' : '-translate-x-full'
+      )}
+    >
       {/* Logo */}
       <div className="flex items-center gap-2 px-4 py-4 border-b border-border">
         <Zap className="h-5 w-5 text-primary" />
@@ -49,6 +52,7 @@ export function Sidebar({ projects, currentProjectId, pendingInvites }: SidebarP
           <Link
             key={project.id}
             href={`/dashboard/projects/${project.id}`}
+            onClick={onClose}
             className={cn(
               'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
               currentProjectId === project.id
@@ -63,6 +67,23 @@ export function Sidebar({ projects, currentProjectId, pendingInvites }: SidebarP
           </Link>
         ))}
 
+        {/* Project settings link for current project */}
+        {activeProjectId && (
+          <Link
+            href={`/dashboard/projects/${activeProjectId}/settings`}
+            onClick={onClose}
+            className={cn(
+              'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
+              pathname === `/dashboard/projects/${activeProjectId}/settings`
+                ? 'bg-accent text-accent-foreground font-medium'
+                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+            )}
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5 shrink-0" />
+            <span>Project Settings</span>
+          </Link>
+        )}
+
         {/* Pending invites */}
         {pendingInvites && pendingInvites.length > 0 && (
           <>
@@ -73,6 +94,7 @@ export function Sidebar({ projects, currentProjectId, pendingInvites }: SidebarP
               <Link
                 key={invite.token}
                 href={`/invite/${invite.token}`}
+                onClick={onClose}
                 className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors text-yellow-600 dark:text-yellow-400 hover:bg-accent hover:text-accent-foreground"
               >
                 <Mail className="h-3.5 w-3.5 shrink-0" />
@@ -87,6 +109,7 @@ export function Sidebar({ projects, currentProjectId, pendingInvites }: SidebarP
 
         <Link
           href="/dashboard/projects"
+          onClick={onClose}
           className={cn(
             'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
             pathname === '/dashboard/projects'
@@ -101,6 +124,7 @@ export function Sidebar({ projects, currentProjectId, pendingInvites }: SidebarP
         <div className="pt-2 border-t border-border">
           <Link
             href="/dashboard/settings"
+            onClick={onClose}
             className={cn(
               'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
               pathname === '/dashboard/settings'
@@ -113,17 +137,6 @@ export function Sidebar({ projects, currentProjectId, pendingInvites }: SidebarP
           </Link>
         </div>
       </nav>
-
-      {/* Sign out */}
-      <div className="border-t border-border p-3">
-        <button
-          onClick={handleSignOut}
-          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-        >
-          <LogOut className="h-3.5 w-3.5" />
-          <span>Sign out</span>
-        </button>
-      </div>
     </aside>
   )
 }

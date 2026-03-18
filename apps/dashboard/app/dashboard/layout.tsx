@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createServerClient, createServiceRoleClient } from '@/lib/supabase/server'
-import { Sidebar } from '@/components/sidebar'
+import { SidebarWrapper } from '@/components/sidebar-wrapper'
 import type { Project } from '@ultron/types'
 
 export default async function DashboardLayout({
@@ -67,8 +67,8 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar projects={allProjects as Project[]} pendingInvites={invites} />
-      <main className="flex-1 overflow-y-auto bg-background">
+      <SidebarWrapper projects={allProjects as Project[]} pendingInvites={invites} />
+      <main className="flex-1 overflow-y-auto bg-background pt-14 md:pt-0">
         {children}
       </main>
     </div>

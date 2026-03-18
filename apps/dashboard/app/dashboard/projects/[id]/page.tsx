@@ -49,7 +49,7 @@ export default async function ProjectErrorsPage({
   ]
 
   return (
-    <div className="p-6">
+    <div className="p-4 md:p-6">
       <div className="mb-6">
         <h1 className="text-xl font-semibold">{(project as Project).name}</h1>
         <p className="text-sm text-muted-foreground mt-0.5">

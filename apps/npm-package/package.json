@@ -1,6 +1,6 @@
 {
   "name": "@ultron-dev/tracker",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Lightweight browser error tracking SDK — zero dependencies, under 5kb gzipped",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",

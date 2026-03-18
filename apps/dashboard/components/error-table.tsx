@@ -310,23 +310,6 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
   return (
     <div className="space-y-3">
 
-      {/* ── Project selector ──────────────────────────────────────────────── */}
-      {projects && projects.length > 1 && (
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground shrink-0">Project</span>
-          <div className="relative">
-            <select
-              value={activeProjectId}
-              onChange={(e) => setActiveProjectId(e.target.value)}
-              className="appearance-none rounded-md border border-input bg-background pl-2.5 pr-7 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-          </div>
-        </div>
-      )}
-
       {/* ── Toolbar ───────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-2">
 

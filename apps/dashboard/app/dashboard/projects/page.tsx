@@ -60,8 +60,8 @@ export default function ProjectsPage() {
   }
 
   return (
-    <div className="p-6 max-w-3xl">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 md:p-6 max-w-3xl">
+      <div className="flex items-center justify-between mb-6 gap-3">
         <div>
           <h1 className="text-xl font-semibold">Projects</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
