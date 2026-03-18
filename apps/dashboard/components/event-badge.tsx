@@ -8,18 +8,18 @@ const CONFIG: Record<EventType, { label: string; className: string }> = {
   resource_error: { label: 'Resource',  className: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
 }
 
-const CATEGORY_CONFIG: Record<string, string> = {
-  cors:            'bg-purple-100 text-purple-700 border-purple-200',
-  server_error:    'bg-red-100 text-red-700 border-red-200',
-  client_error:    'bg-orange-100 text-orange-700 border-orange-200',
-  slow:            'bg-yellow-100 text-yellow-700 border-yellow-200',
-  network_failure: 'bg-gray-100 text-gray-700 border-gray-200',
+const CATEGORY_CONFIG: Record<string, { className: string; label: string }> = {
+  cors:            { className: 'bg-purple-100 text-purple-700 border-purple-200', label: 'CORS' },
+  server_error:    { className: 'bg-red-100 text-red-700 border-red-200',          label: 'Server Error' },
+  client_error:    { className: 'bg-orange-100 text-orange-700 border-orange-200', label: 'Client Error' },
+  slow:            { className: 'bg-yellow-100 text-yellow-700 border-yellow-200', label: 'Slow' },
+  network_failure: { className: 'bg-gray-100 text-gray-700 border-gray-200',       label: 'Network Failure' },
 }
 
-const RATING_CONFIG: Record<string, string> = {
-  good:              'bg-green-100 text-green-700 border-green-200',
-  'needs-improvement': 'bg-yellow-100 text-yellow-700 border-yellow-200',
-  poor:              'bg-red-100 text-red-700 border-red-200',
+const RATING_CONFIG: Record<string, { className: string; label: string }> = {
+  good:                { className: 'bg-green-100 text-green-700 border-green-200',   label: 'Good' },
+  'needs-improvement': { className: 'bg-yellow-100 text-yellow-700 border-yellow-200', label: 'Needs Improvement' },
+  poor:                { className: 'bg-red-100 text-red-700 border-red-200',          label: 'Poor' },
 }
 
 interface BadgeProps {
@@ -45,11 +45,11 @@ export function EventTypeBadge({ type }: { type: EventType }) {
 }
 
 export function CategoryBadge({ category }: { category: string }) {
-  const className = CATEGORY_CONFIG[category] ?? 'bg-gray-100 text-gray-700 border-gray-200'
-  return <Badge className={className}>{category.replace('_', ' ')}</Badge>
+  const cfg = CATEGORY_CONFIG[category]
+  return <Badge className={cfg?.className ?? 'bg-gray-100 text-gray-700 border-gray-200'}>{cfg?.label ?? category}</Badge>
 }
 
 export function VitalRatingBadge({ rating }: { rating: string }) {
-  const className = RATING_CONFIG[rating] ?? 'bg-gray-100 text-gray-700 border-gray-200'
-  return <Badge className={className}>{rating}</Badge>
+  const cfg = RATING_CONFIG[rating]
+  return <Badge className={cfg?.className ?? 'bg-gray-100 text-gray-700 border-gray-200'}>{cfg?.label ?? rating}</Badge>
 }
