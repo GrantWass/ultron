@@ -7,7 +7,7 @@ import { EventTypeBadge } from '@/components/event-badge'
 import type { ErrorRecord, EventType } from '@ultron/types'
 import {
   Search, AlertCircle, RefreshCw, X, CheckCircle,
-  ChevronDown, Clock, Globe, Wifi, Monitor, Trash2,
+  ChevronDown, Clock, Globe, Wifi, Monitor, Trash2, Ban, ChevronRight,
 } from 'lucide-react'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -158,6 +158,174 @@ function ResolveModal({ error, projectId, onConfirm, onCancel, resolving }: Reso
   )
 }
 
+// ── Filter modal ──────────────────────────────────────────────────────────────
+
+interface IngestFilter {
+  id: string
+  project_id: string
+  fingerprint: string
+  message: string
+  event_type: string | null
+  note: string | null
+  created_at: string
+}
+
+interface FilterModalProps {
+  error: ErrorRecord
+  projectId: string
+  onConfirm: (note: string) => Promise<void>
+  onCancel: () => void
+  saving: boolean
+}
+
+function FilterModal({ error, onConfirm, onCancel, saving }: FilterModalProps) {
+  const [note, setNote] = useState('')
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onCancel() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onCancel])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      onClick={(e) => { if (e.target === e.currentTarget) onCancel() }}
+    >
+      <div className="w-full max-w-lg rounded-xl border border-border bg-card shadow-xl">
+        <div className="flex items-start justify-between p-5 pb-4 border-b border-border">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-500/10">
+              <Ban className="h-4 w-4 text-orange-500" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold">Add ingest filter</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Future events matching this fingerprint will be dropped at ingest</p>
+            </div>
+          </div>
+          <button onClick={onCancel} className="rounded-md p-1 hover:bg-accent transition-colors text-muted-foreground">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Message</p>
+            <div className="rounded-md border border-border bg-muted/40 px-3 py-2.5">
+              <p className="font-mono text-xs text-foreground/80 break-all leading-relaxed">{error.message}</p>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Note <span className="normal-case font-normal">(optional)</span>
+            </label>
+            <input
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="e.g. expected behavior, not a real error"
+              className="h-8 w-full rounded-md border border-input bg-background px-3 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              autoFocus
+            />
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Existing errors are not deleted — use <span className="font-medium text-foreground">Resolve</span> to clear past occurrences.
+          </p>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border">
+          <button
+            onClick={onCancel}
+            disabled={saving}
+            className="rounded-md border border-input px-4 py-2 text-sm hover:bg-accent transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onConfirm(note)}
+            disabled={saving}
+            className="inline-flex items-center gap-2 rounded-md bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 transition-colors disabled:opacity-50"
+          >
+            {saving ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" />Saving…</> : <><Ban className="h-3.5 w-3.5" />Add filter</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Filters panel ─────────────────────────────────────────────────────────────
+
+interface FiltersPanelProps {
+  projectId: string
+  filters: IngestFilter[]
+  onDelete: (id: string) => Promise<void>
+}
+
+function FiltersPanel({ filters, onDelete }: FiltersPanelProps) {
+  const [open, setOpen] = useState(false)
+  const [deleting, setDeleting] = useState<string | null>(null)
+
+  if (filters.length === 0) return null
+
+  async function handleDelete(id: string) {
+    setDeleting(id)
+    await onDelete(id)
+    setDeleting(null)
+  }
+
+  return (
+    <div className="rounded-lg border border-orange-200 dark:border-orange-900 overflow-hidden">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between gap-2 px-4 py-2.5 bg-orange-50 dark:bg-orange-950/40 hover:bg-orange-100 dark:hover:bg-orange-950/60 transition-colors text-left"
+      >
+        <div className="flex items-center gap-2">
+          <Ban className="h-3.5 w-3.5 text-orange-500 shrink-0" />
+          <span className="text-xs font-medium text-orange-700 dark:text-orange-400">
+            {filters.length} active ingest filter{filters.length !== 1 ? 's' : ''}
+          </span>
+          <span className="text-[11px] text-orange-500/70">— matching events are dropped before storage</span>
+        </div>
+        <ChevronRight className={`h-3.5 w-3.5 text-orange-400 transition-transform ${open ? 'rotate-90' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="divide-y divide-border bg-background">
+          {filters.map((f) => (
+            <div key={f.id} className="flex items-start gap-3 px-4 py-2.5">
+              <div className="min-w-0 flex-1 space-y-0.5">
+                <p className="text-xs font-mono text-foreground/80 truncate">{f.message}</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {f.event_type && (
+                    <span className="text-[11px] bg-muted px-1.5 py-0.5 rounded font-mono text-muted-foreground">{f.event_type}</span>
+                  )}
+                  {f.note && (
+                    <span className="text-[11px] text-muted-foreground italic">{f.note}</span>
+                  )}
+                  {!f.event_type && !f.note && (
+                    <span className="text-[11px] text-muted-foreground">all event types</span>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => handleDelete(f.id)}
+                disabled={deleting === f.id}
+                title="Remove filter"
+                className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors disabled:opacity-40 mt-0.5"
+              >
+                {deleting === f.id ? <RefreshCw className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Dropdown filter ───────────────────────────────────────────────────────────
 
 function FilterDropdown({
@@ -217,6 +385,9 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
   const [loading, setLoading]   = useState(true)
   const [resolveTarget, setResolveTarget] = useState<ErrorRecord | null>(null)
   const [resolving, setResolving]         = useState(false)
+  const [filterTarget, setFilterTarget]   = useState<ErrorRecord | null>(null)
+  const [savingFilter, setSavingFilter]   = useState(false)
+  const [filters, setFilters]             = useState<IngestFilter[]>([])
 
   // Filter state
   const [search, setSearch]         = useState('')
@@ -270,6 +441,48 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProjectId])
 
+  const fetchFilters = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/filters?project_id=${activeProjectId}`)
+      if (res.ok) setFilters(await res.json())
+    } catch { /* ignore */ }
+  }, [activeProjectId])
+
+  useEffect(() => { fetchFilters() }, [fetchFilters])
+
+  async function confirmFilter(note: string) {
+    if (!filterTarget) return
+    setSavingFilter(true)
+    try {
+      const res = await fetch('/api/filters', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: activeProjectId,
+          message: filterTarget.message,
+          event_type: filterTarget.event_type ?? null,
+          note: note || null,
+        }),
+      })
+      if (!res.ok && res.status !== 409) throw new Error('Failed to create filter')
+      setFilterTarget(null)
+      await fetchFilters()
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setSavingFilter(false)
+    }
+  }
+
+  async function deleteFilter(id: string) {
+    try {
+      await fetch(`/api/filters?id=${id}`, { method: 'DELETE' })
+      await fetchFilters()
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
   async function confirmResolve() {
     if (!resolveTarget) return
     setResolving(true)
@@ -304,6 +517,13 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
 
   return (
     <div className="space-y-3">
+
+      {/* ── Ingest filters panel ──────────────────────────────────────────── */}
+      <FiltersPanel
+        projectId={activeProjectId}
+        filters={filters}
+        onDelete={deleteFilter}
+      />
 
       {/* ── Toolbar ───────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-2">
@@ -504,6 +724,13 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
                 </p>
               </Link>
               <button
+                onClick={(e) => { e.preventDefault(); setFilterTarget(error) }}
+                title="Add ingest filter — drop future events with this fingerprint"
+                className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-orange-500/10 hover:text-orange-500 mt-0.5"
+              >
+                <Ban className="h-3.5 w-3.5" />
+              </button>
+              <button
                 onClick={(e) => { e.preventDefault(); setResolveTarget(error) }}
                 title="Resolve — delete all errors with this message"
                 className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive mt-0.5"
@@ -551,6 +778,17 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
           onConfirm={confirmResolve}
           onCancel={() => { if (!resolving) setResolveTarget(null) }}
           resolving={resolving}
+        />
+      )}
+
+      {/* ── Filter modal ──────────────────────────────────────────────────── */}
+      {filterTarget && (
+        <FilterModal
+          error={filterTarget}
+          projectId={activeProjectId}
+          onConfirm={confirmFilter}
+          onCancel={() => { if (!savingFilter) setFilterTarget(null) }}
+          saving={savingFilter}
         />
       )}
     </div>

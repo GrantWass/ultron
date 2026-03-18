@@ -95,7 +95,24 @@ export async function POST(request: Request) {
     )
   }
 
-  const records = parsed.data.errors.map((e) => ({
+  // Fetch active ingest filters for this project
+  const { data: activeFilters } = await supabase
+    .from('ingest_filters')
+    .select('fingerprint, event_type')
+    .eq('project_id', project.id)
+
+  const filteredFingerprints = new Set(
+    (activeFilters ?? [])
+      .filter((f) => !f.event_type)  // null event_type = match all types
+      .map((f) => f.fingerprint)
+  )
+  const filteredByType = new Map(
+    (activeFilters ?? [])
+      .filter((f) => f.event_type)
+      .map((f) => [`${f.event_type}:${f.fingerprint}`, true])
+  )
+
+  const allRecords = parsed.data.errors.map((e) => ({
     project_id: project.id,
     event_type: e.event_type,
     message: e.message,
@@ -110,11 +127,23 @@ export async function POST(request: Request) {
     metadata: e.metadata,
   }))
 
+  const records = allRecords.filter((r) => {
+    const fp = r.message_fingerprint
+    if (filteredFingerprints.has(fp)) return false
+    if (filteredByType.has(`${r.event_type}:${fp}`)) return false
+    return true
+  })
+
+  if (records.length === 0) {
+    return NextResponse.json({ received: 0, filtered: allRecords.length }, { headers: CORS_HEADERS })
+  }
+
   const { error: insertError } = await supabase.from('errors').insert(records)
   if (insertError) {
     console.error('Ingest insert error:', insertError)
     return NextResponse.json({ error: 'Failed to store errors' }, { status: 500, headers: CORS_HEADERS })
   }
 
-  return NextResponse.json({ received: records.length }, { headers: CORS_HEADERS })
+  const filtered = allRecords.length - records.length
+  return NextResponse.json({ received: records.length, ...(filtered > 0 && { filtered }) }, { headers: CORS_HEADERS })
 }

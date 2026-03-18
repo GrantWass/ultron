@@ -74,6 +74,21 @@ create table if not exists fix_suggestions (
   created_at timestamptz not null default now()
 );
 
+-- Ingest filters — events matching these fingerprints are dropped at ingest time
+create table if not exists ingest_filters (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid references projects(id) on delete cascade not null,
+  fingerprint text not null,           -- normalized message fingerprint
+  message text not null,               -- original message, for display
+  event_type text,                     -- null = match all event types
+  note text,                           -- optional human label
+  created_at timestamptz not null default now(),
+  unique (project_id, fingerprint, event_type)
+);
+
+create index if not exists ingest_filters_project_id
+  on ingest_filters(project_id);
+
 -- ============================================================
 -- ROW LEVEL SECURITY
 -- ============================================================
@@ -84,6 +99,7 @@ alter table errors enable row level security;
 alter table github_user_connections enable row level security;
 alter table github_connections enable row level security;
 alter table fix_suggestions enable row level security;
+alter table ingest_filters enable row level security;
 
 -- profiles: each user manages their own profile
 create policy "Users can manage own profile"
@@ -248,6 +264,22 @@ create policy "Members can view fix suggestions"
       where e.id = fix_suggestions.error_id
         and pm.user_id = auth.uid()
         and pm.status = 'accepted'
+    )
+  );
+
+-- ingest_filters: owners can manage, accepted members can read
+create policy "Owners can manage ingest filters"
+  on ingest_filters for all
+  using (get_project_owner(ingest_filters.project_id) = auth.uid());
+
+create policy "Members can view ingest filters"
+  on ingest_filters for select
+  using (
+    exists (
+      select 1 from project_members
+      where project_members.project_id = ingest_filters.project_id
+        and project_members.user_id = auth.uid()
+        and project_members.status = 'accepted'
     )
   );
 
