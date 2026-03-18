@@ -97,8 +97,7 @@ PUBLIC_ULTRON_API_KEY=${apiKey}`
   }
 }
 
-function SdkSetup({ apiKey }: { apiKey: string }) {
-  const [framework, setFramework] = useState<Framework>('nextjs')
+function SdkSetup({ apiKey, framework }: { apiKey: string; framework: Framework }) {
   const [copied, setCopied] = useState(false)
   const snippet = getSnippet(framework, apiKey)
 
@@ -109,9 +108,39 @@ function SdkSetup({ apiKey }: { apiKey: string }) {
   }
 
   return (
-    <>
-      <div className="px-4 py-3 border-b border-border flex items-center justify-end gap-3 flex-wrap">
-        <div className="flex gap-1 rounded-md border border-border p-1 bg-background flex-wrap">
+    <div className="relative">
+      <pre className="text-xs font-mono bg-background p-4 overflow-x-auto leading-relaxed">
+        {snippet}
+      </pre>
+      <button
+        onClick={copySnippet}
+        className="absolute top-2.5 right-2.5 flex items-center gap-1 rounded border border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+      >
+        {copied ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3" />}
+        {copied ? 'Copied!' : 'Copy'}
+      </button>
+    </div>
+  )
+}
+
+function SdkSetupCollapsible({ apiKey }: { apiKey: string }) {
+  const [open, setOpen] = useState(true)
+  const [framework, setFramework] = useState<Framework>('nextjs')
+  return (
+    <div className="rounded-md border border-border overflow-hidden bg-muted/30">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex items-center gap-1.5 hover:opacity-70 transition-opacity"
+        >
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+            <Code2 className="h-3.5 w-3.5" />
+            SDK Setup
+          </h3>
+          <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${open ? '' : '-rotate-90'}`} />
+        </button>
+        <div className="flex gap-1 rounded-md border border-border p-1 bg-background">
           {FRAMEWORKS.map(({ value, label }) => (
             <button
               key={value}
@@ -127,38 +156,7 @@ function SdkSetup({ apiKey }: { apiKey: string }) {
           ))}
         </div>
       </div>
-      <div className="relative">
-        <pre className="text-xs font-mono bg-background p-4 overflow-x-auto leading-relaxed">
-          {snippet}
-        </pre>
-        <button
-          onClick={copySnippet}
-          className="absolute top-2.5 right-2.5 flex items-center gap-1 rounded border border-border bg-background px-2 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-        >
-          {copied ? <Check className="h-3 w-3 text-green-600" /> : <Copy className="h-3 w-3" />}
-          {copied ? 'Copied!' : 'Copy'}
-        </button>
-      </div>
-    </>
-  )
-}
-
-function SdkSetupCollapsible({ apiKey }: { apiKey: string }) {
-  const [open, setOpen] = useState(true)
-  return (
-    <div className="rounded-md border border-border overflow-hidden bg-muted/30">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-4 py-3 border-b border-border hover:bg-muted/40 transition-colors"
-      >
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-          <Code2 className="h-3.5 w-3.5" />
-          SDK Setup
-        </h3>
-        <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${open ? '' : '-rotate-90'}`} />
-      </button>
-      {open && <SdkSetup apiKey={apiKey} />}
+      {open && <SdkSetup apiKey={apiKey} framework={framework} />}
     </div>
   )
 }

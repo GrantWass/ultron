@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import type { Project } from '@ultron/types'
 import { AlertCircle, FolderOpen, Settings, Zap, Users, Mail, SlidersHorizontal } from 'lucide-react'
+import React from 'react'
 
 interface PendingInvite {
   token: string
@@ -49,40 +50,40 @@ export function Sidebar({ projects, currentProjectId, pendingInvites, isOpen, on
         </p>
 
         {projects.map((project) => (
-          <Link
-            key={project.id}
-            href={`/dashboard/projects/${project.id}`}
-            onClick={onClose}
-            className={cn(
-              'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
-              currentProjectId === project.id
-                ? 'bg-accent text-accent-foreground font-medium'
-                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-            )}
-          >
-            {(project as any).is_owner === false
-              ? <Users className="h-3.5 w-3.5 shrink-0" />
-              : <AlertCircle className="h-3.5 w-3.5 shrink-0" />}
-            <span className="truncate">{project.name}</span>
-          </Link>
-        ))}
+          <React.Fragment key={project.id}>
+            <Link
+              href={`/dashboard/projects/${project.id}`}
+              onClick={onClose}
+              className={cn(
+                'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
+                activeProjectId === project.id
+                  ? 'bg-accent text-accent-foreground font-medium'
+                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+              )}
+            >
+              {(project as any).is_owner === false
+                ? <Users className="h-3.5 w-3.5 shrink-0" />
+                : <AlertCircle className="h-3.5 w-3.5 shrink-0" />}
+              <span className="truncate">{project.name}</span>
+            </Link>
 
-        {/* Project settings link for current project */}
-        {activeProjectId && (
-          <Link
-            href={`/dashboard/projects/${activeProjectId}/settings`}
-            onClick={onClose}
-            className={cn(
-              'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
-              pathname === `/dashboard/projects/${activeProjectId}/settings`
-                ? 'bg-accent text-accent-foreground font-medium'
-                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+            {activeProjectId === project.id && (
+              <Link
+                href={`/dashboard/projects/${project.id}/settings`}
+                onClick={onClose}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-md pl-5 pr-2 py-1 text-xs transition-colors ml-1 border-l-2',
+                  pathname === `/dashboard/projects/${project.id}/settings`
+                    ? 'border-primary bg-primary/10 text-primary font-medium'
+                    : 'border-primary/30 text-muted-foreground hover:bg-accent hover:text-accent-foreground hover:border-primary/60'
+                )}
+              >
+                <SlidersHorizontal className="h-3 w-3 shrink-0" />
+                <span>Settings</span>
+              </Link>
             )}
-          >
-            <SlidersHorizontal className="h-3.5 w-3.5 shrink-0" />
-            <span>Project Settings</span>
-          </Link>
-        )}
+          </React.Fragment>
+        ))}
 
         {/* Pending invites */}
         {pendingInvites && pendingInvites.length > 0 && (

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 import type { GithubConnection } from '@ultron/types'
@@ -388,9 +388,9 @@ function ProjectSettingsContent({ projectId }: { projectId: string }) {
 export default function ProjectSettingsPage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: { id: string }
 }) {
-  const { id } = use(params)
+  const { id } = params
   return (
     <Suspense fallback={<div className="p-6 text-muted-foreground text-sm">Loading…</div>}>
       <ProjectSettingsContent projectId={id} />
