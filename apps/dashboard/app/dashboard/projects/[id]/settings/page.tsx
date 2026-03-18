@@ -6,7 +6,7 @@ import { Suspense } from 'react'
 import type { ProjectMember } from '@ultron/types'
 import {
   Github, Check, Code2, Users, Trash2, Mail,
-  Search, Lock, RefreshCw, Settings,
+  Search, Lock, RefreshCw, Settings, ExternalLink,
 } from 'lucide-react'
 
 // ── GitHub repo section ────────────────────────────────────────────────────────
