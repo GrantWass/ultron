@@ -5,21 +5,9 @@ import { FixSuggestion } from '@/components/fix-suggestion'
 import { EventTypeBadge, CategoryBadge, VitalRatingBadge } from '@/components/event-badge'
 import { ResolveButton } from '@/components/resolve-button'
 import type { ErrorRecord } from '@ultron/types'
-import { ArrowLeft, Info } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
-
-// ── Shared tooltip ─────────────────────────────────────────────────────────────
-
-function Tip({ text }: { text: string }) {
-  return (
-    <span className="relative group inline-flex items-center cursor-help">
-      <Info className="h-3 w-3 text-muted-foreground/50 hover:text-muted-foreground transition-colors" />
-      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity z-50 normal-case font-normal leading-relaxed">
-        {text}
-      </span>
-    </span>
-  )
-}
+import { Tip } from '@/components/tip'
 
 // ── Metadata helpers ──────────────────────────────────────────────────────────
 
