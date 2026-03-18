@@ -229,11 +229,6 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
   const [searchInput, setSearchInput] = useState('')
 
   const limit = 50
-
-  // TODO: delete — test error to verify Ultron tracker is capturing
-  useEffect(() => {
-    console.error('Ultron smoke test — delete me')
-  }, [])
   const searchRef = useRef<HTMLInputElement>(null)
 
   function clearAllFilters() {
