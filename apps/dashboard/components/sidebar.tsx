@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import type { Project } from '@ultron/types'
+import type { ProjectWithOwnerFlag } from '@ultron/types'
 import { AlertCircle, FolderOpen, Settings, Zap, Users, Mail, SlidersHorizontal } from 'lucide-react'
 import React from 'react'
 
@@ -14,7 +14,7 @@ interface PendingInvite {
 }
 
 interface SidebarProps {
-  projects: Project[]
+  projects: ProjectWithOwnerFlag[]
   currentProjectId?: string
   pendingInvites?: PendingInvite[]
   isOpen?: boolean
@@ -61,7 +61,7 @@ export function Sidebar({ projects, currentProjectId, pendingInvites, isOpen, on
                   : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
               )}
             >
-              {(project as any).is_owner === false
+              {project.is_owner === false
                 ? <Users className="h-3.5 w-3.5 shrink-0" />
                 : <AlertCircle className="h-3.5 w-3.5 shrink-0" />}
               <span className="truncate">{project.name}</span>

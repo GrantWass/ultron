@@ -4,7 +4,7 @@ import { formatDate } from '@/lib/utils'
 import { FixSuggestion } from '@/components/fix-suggestion'
 import { EventTypeBadge, CategoryBadge, VitalRatingBadge } from '@/components/event-badge'
 import { ResolveButton } from '@/components/resolve-button'
-import type { ErrorRecord } from '@ultron/types'
+import type { ErrorWithProject } from '@ultron/types'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { Tip } from '@/components/tip'
@@ -381,20 +381,19 @@ export default async function ErrorDetailPage({
 
   // Fetch error via service role, then verify caller has access
   const serviceClient = createServiceRoleClient()
-  const { data: error } = await serviceClient
+  const { data: rawError } = await serviceClient
     .from('errors')
     .select(`*, projects!inner(id, user_id, name)`)
     .eq('id', id)
     .single()
 
-  if (!error) notFound()
+  if (!rawError) notFound()
 
-  const projectId = (error as any).project_id as string
-  const isOwner = (error as any).projects?.user_id === user.id
+  const err = rawError as unknown as ErrorWithProject
+  const projectId = err.project_id
+  const isOwner = err.projects.user_id === user.id
   const isMember = memberProjectIds.includes(projectId)
   if (!isOwner && !isMember) notFound()
-
-  const err = error as ErrorRecord & { projects: { id: string; name: string } }
   const meta = (err.metadata ?? {}) as Record<string, unknown>
   const eventType = err.event_type ?? 'error'
 
@@ -421,14 +420,14 @@ export default async function ErrorDetailPage({
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to {(error as any).projects?.name ?? 'project'}
+        Back to {err.projects.name}
       </Link>
 
       {/* Header */}
       <div className="space-y-2">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 min-w-0">
-            <EventTypeBadge type={eventType as any} />
+            <EventTypeBadge type={eventType} />
             <h1 className="font-mono text-lg font-semibold break-all leading-snug">
               {err.message}
             </h1>

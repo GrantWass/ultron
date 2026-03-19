@@ -3,7 +3,7 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { createServerClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { parseStackTrace, extractSearchKeywords } from '@/lib/stack-parser'
 import { fetchGitHubFiles, searchAndFetchGitHubFiles } from '@/lib/github'
-import type { ErrorRecord, RelevantFile } from '@ultron/types'
+import type { ErrorRecord, ErrorWithProjectAndGitHub, RelevantFile } from '@ultron/types'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
 
   // Fetch error via service role, then verify caller is owner or accepted member
   const service = createServiceRoleClient()
-  const { data: error } = await service
+  const { data: rawError } = await service
     .from('errors')
     .select(`
       *,
@@ -89,15 +89,16 @@ export async function POST(request: Request) {
     .eq('id', errorId)
     .single()
 
-  if (!error) {
+  if (!rawError) {
     return new Response(JSON.stringify({ error: 'Error not found' }), {
       status: 404,
       headers: { 'Content-Type': 'application/json' },
     })
   }
 
-  const projectId = (error as any).projects?.id
-  const isOwner = (error as any).projects?.user_id === user.id
+  const error = rawError as unknown as ErrorWithProjectAndGitHub
+  const projectId = error.projects.id
+  const isOwner = error.projects.user_id === user.id
   if (!isOwner) {
     const { data: memberRow } = await service
       .from('project_members')
@@ -138,9 +139,8 @@ export async function POST(request: Request) {
   }
 
   // Get GitHub token from project owner's user connection
-  const projectOwnerId = (error as any).projects?.user_id
-  const rawConn = (error as any).projects?.github_connections
-  const githubConn = Array.isArray(rawConn) ? rawConn[0] : rawConn
+  const projectOwnerId = error.projects.user_id
+  const githubConn = error.projects.github_connections[0] ?? null
 
   let accessToken: string | null = null
   if (githubConn?.repo_owner && githubConn?.repo_name && projectOwnerId) {
@@ -183,7 +183,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const prompt = buildPrompt(error as ErrorRecord, files)
+  const prompt = buildPrompt(error, files)
 
   const result = streamText({
     model: openai('gpt-5-mini'),

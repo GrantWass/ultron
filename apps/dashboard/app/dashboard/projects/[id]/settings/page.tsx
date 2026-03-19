@@ -373,7 +373,7 @@ function ProjectSettingsContent({ projectId }: { projectId: string }) {
   useEffect(() => {
     fetch('/api/projects')
       .then((r) => r.json())
-      .then((projects: any[]) => {
+      .then((projects: { id: string; name: string; is_owner: boolean }[]) => {
         const project = projects.find((p) => p.id === projectId)
         if (project) {
           setProjectName(project.name)

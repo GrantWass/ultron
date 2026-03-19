@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Menu, Zap } from 'lucide-react'
 import { Sidebar } from './sidebar'
-import type { Project } from '@ultron/types'
+import type { ProjectWithOwnerFlag } from '@ultron/types'
 
 interface PendingInvite {
   token: string
@@ -12,7 +12,7 @@ interface PendingInvite {
 }
 
 interface SidebarWrapperProps {
-  projects: Project[]
+  projects: ProjectWithOwnerFlag[]
   pendingInvites?: PendingInvite[]
 }
 

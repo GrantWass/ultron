@@ -125,3 +125,39 @@ export interface GitHubFileContent {
 export interface FixRequest {
   error_id: string
 }
+
+// Computed project type returned by GET /api/projects
+export interface ProjectWithOwnerFlag extends Project {
+  is_owner: boolean
+  has_github_connection: boolean
+}
+
+// project_members row with joined projects(name) for invite pages
+export interface ProjectMemberWithProject {
+  id: string
+  invited_email: string
+  status: 'pending' | 'accepted'
+  project_id: string
+  projects: { name: string } | null
+}
+
+// Joined query result types (Supabase selects with relations)
+
+export interface ErrorWithProject extends ErrorRecord {
+  projects: {
+    id: string
+    user_id: string
+    name: string
+  }
+}
+
+export interface ErrorWithProjectAndGitHub extends ErrorRecord {
+  projects: {
+    id: string
+    user_id: string
+    github_connections: Array<{
+      repo_owner: string
+      repo_name: string
+    }>
+  }
+}

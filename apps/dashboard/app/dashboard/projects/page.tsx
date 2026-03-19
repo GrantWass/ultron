@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import type { Project } from '@ultron/types'
+import type { ProjectWithOwnerFlag } from '@ultron/types'
 import { formatDate } from '@/lib/utils'
 import { Plus, Trash2, Key, AlertCircle, GitBranch, UserCheck } from 'lucide-react'
 
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState<Project[]>([])
+  const [projects, setProjects] = useState<ProjectWithOwnerFlag[]>([])
   const [loading, setLoading] = useState(true)
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
@@ -118,10 +118,10 @@ export default function ProjectsPage() {
       ) : (
         <div className="space-y-6">
           {/* Owned projects */}
-          {projects.some((p: any) => p.is_owner !== false) && (
+          {projects.some((p) => p.is_owner !== false) && (
             <div className="space-y-3">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">My Projects</p>
-              {projects.filter((p: any) => p.is_owner !== false).map((project: any) => (
+              {projects.filter((p) => p.is_owner !== false).map((project) => (
                 <div key={project.id} className="rounded-md border border-border p-4 flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -153,10 +153,10 @@ export default function ProjectsPage() {
           )}
 
           {/* Shared projects */}
-          {projects.some((p: any) => p.is_owner === false) && (
+          {projects.some((p) => p.is_owner === false) && (
             <div className="space-y-3">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Shared with me</p>
-              {projects.filter((p: any) => p.is_owner === false).map((project: any) => (
+              {projects.filter((p) => p.is_owner === false).map((project) => (
                 <div key={project.id} className="rounded-md border border-border p-4 flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
