@@ -20,22 +20,6 @@ const EVENT_LABELS = {
   resource_error: 'Resource',
 } as const
 
-interface StatCardProps {
-  label: string
-  value: number
-  color?: string
-}
-
-function StatCard({ label, value, color }: StatCardProps) {
-  return (
-    <div className="rounded-md border border-border bg-card px-4 py-3 flex flex-col gap-1">
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <span className="text-2xl font-semibold font-mono" style={color ? { color } : undefined}>
-        {value.toLocaleString()}
-      </span>
-    </div>
-  )
-}
 
 function fmt(day: string) {
   const d = new Date(day + 'T00:00:00')
@@ -80,21 +64,21 @@ export function AnalyticsPanel({ projectId, days = 30 }: AnalyticsPanelProps) {
 
   return (
     <div className="space-y-4">
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Total events" value={totals.total} />
-        <StatCard label="JS Errors"    value={totals.error}          color={EVENT_COLORS.error} />
-        <StatCard label="Network"      value={totals.network}        color={EVENT_COLORS.network} />
-        <StatCard label="Vitals"       value={totals.vital}          color={EVENT_COLORS.vital} />
-      </div>
-
       {/* Timeline chart + top browsers */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_200px] gap-3">
         {/* Stacked bar chart */}
         <div className="rounded-md border border-border bg-card p-4">
-          <p className="text-xs font-medium text-muted-foreground mb-3">
-            Events over last {days} days
-          </p>
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <p className="text-xs font-medium text-muted-foreground">Events over last {days} days</p>
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-mono font-semibold">{totals.total.toLocaleString()} total</span>
+              {(['error', 'network', 'vital'] as const).filter(k => totals[k] > 0).map(k => (
+                <span key={k} className="text-xs font-mono" style={{ color: EVENT_COLORS[k] }}>
+                  {totals[k].toLocaleString()} {EVENT_LABELS[k].toLowerCase()}
+                </span>
+              ))}
+            </div>
+          </div>
           {totals.total === 0 ? (
             <div className="h-32 flex items-center justify-center text-sm text-muted-foreground">
               No events in this period

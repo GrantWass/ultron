@@ -329,16 +329,18 @@ function FiltersPanel({ filters, onDelete }: FiltersPanelProps) {
 // ── Dropdown filter ───────────────────────────────────────────────────────────
 
 function FilterDropdown({
-  label, icon: Icon, value, onChange, options, placeholder,
+  label, icon: Icon, value, onChange, options, entries, placeholder,
 }: {
   label: string
   icon: React.ElementType
   value: string
   onChange: (v: string) => void
-  options: string[]
+  options?: string[]
+  entries?: { value: string; label: string }[]
   placeholder: string
 }) {
   const active = !!value
+  const items: { value: string; label: string }[] = entries ?? (options ?? []).map((o) => ({ value: o, label: o }))
   return (
     <div className="relative">
       <Icon className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -352,7 +354,7 @@ function FilterDropdown({
           }`}
       >
         <option value="">{placeholder}</option>
-        {options.map((o) => <option key={o} value={o}>{o}</option>)}
+        {items.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
       <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
       {active && (
@@ -554,7 +556,7 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
           value={timeRange}
           onChange={(v) => { setTimeRange(v); setPage(1) }}
           placeholder="Any time"
-          options={TIME_RANGES.slice(1).map((t) => t.label)}
+          entries={TIME_RANGES.slice(1)}
         />
 
         {/* Browser */}
