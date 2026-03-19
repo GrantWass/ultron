@@ -65,7 +65,7 @@ export async function GET(request: Request) {
 
   // ── Totals ───────────────────────────────────────────────────────────────
   const totals: AnalyticsResponse['totals'] = { error: 0, network: 0, vital: 0, resource_error: 0, total: 0 }
-  for (const b of dayMap.values()) {
+  for (const b of Array.from(dayMap.values())) {
     totals.error          += b.error
     totals.network        += b.network
     totals.vital          += b.vital
