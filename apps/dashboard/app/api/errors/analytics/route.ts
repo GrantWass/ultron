@@ -79,7 +79,7 @@ export async function GET(request: Request) {
     const b = row.browser ?? 'Unknown'
     browserMap.set(b, (browserMap.get(b) ?? 0) + 1)
   }
-  const topBrowsers = [...browserMap.entries()]
+  const topBrowsers = Array.from(browserMap.entries())
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5)
     .map(([browser, count]) => ({ browser, count }))
