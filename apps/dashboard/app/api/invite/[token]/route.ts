@@ -23,7 +23,7 @@ export async function GET(
   return NextResponse.json({
     invitedEmail: invite.invited_email,
     projectId: invite.project_id,
-    projectName: (invite.projects as { name: string } | null)?.name ?? 'a project',
+    projectName: (invite.projects as unknown as { name: string } | null)?.name ?? 'a project',
   })
 }
 

@@ -79,7 +79,7 @@ export default async function InvitePage({
     )
   }
 
-  const projectName = (invite.projects as { name: string } | null)?.name ?? 'a project'
+  const projectName = (invite.projects as unknown as { name: string } | null)?.name ?? 'a project'
 
   return (
     <Layout>
