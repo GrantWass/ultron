@@ -31,6 +31,7 @@ const ErrorPayloadSchema = z.object({
   viewport: z.string().max(100).default(''),
   connection: z.string().max(50).default(''),
   session_id: z.string().max(100).default(''),
+  session_recording_id: z.string().uuid().optional(),
   metadata: z.record(z.unknown()).optional().default({}),
   timestamp: z.number().default(() => Date.now()),
 })
@@ -124,6 +125,7 @@ export async function POST(request: Request) {
     viewport: e.viewport || null,
     connection: e.connection || null,
     session_id: e.session_id,
+    session_recording_id: e.session_recording_id ?? null,
     metadata: e.metadata,
   }))
 

@@ -5,12 +5,15 @@ import { ErrorQueue } from './queue'
 import { monitorNetwork } from './network'
 import { collectVitals } from './vitals'
 import { monitorResourceErrors } from './resource-errors'
+import { initSessionReplay } from './session-replay'
+import type { SessionReplayHandle } from './session-replay'
 
 export class UltronTracker {
   private config: TrackerConfig
   private queue: ErrorQueue
   private attached = false
   private capturing = false
+  private sessionReplay: SessionReplayHandle | null = null
 
   private originalOnError: OnErrorEventHandler | null = null
   private originalOnUnhandledRejection: ((e: PromiseRejectionEvent) => void) | null = null
@@ -32,6 +35,16 @@ export class UltronTracker {
     monitorNetwork(this.queue, this.config)
     collectVitals(this.queue, this.config)
     this.queue.start()
+
+    if (this.config.sessionReplay) {
+      const replayCfg = typeof this.config.sessionReplay === 'object' ? this.config.sessionReplay : {}
+      void initSessionReplay(
+        this.config.apiKey,
+        getSessionId(),
+        replayCfg.bufferSeconds ?? 60,
+        replayCfg.maskAllInputs ?? true,
+      ).then((handle) => { this.sessionReplay = handle })
+    }
 
     if (this.config.debug) {
       console.debug('[Ultron] Tracker initialized')
@@ -96,7 +109,11 @@ export class UltronTracker {
     if (this.capturing) return
     this.capturing = true
     try {
-      this.queue.enqueue(this.buildPayload(error, metadata))
+      const payload = this.buildPayload(error, metadata)
+      if (this.sessionReplay) {
+        payload.session_recording_id = this.sessionReplay.captureSnapshot()
+      }
+      this.queue.enqueue(payload)
     } finally {
       this.capturing = false
     }
@@ -110,6 +127,7 @@ export class UltronTracker {
     }
     if (this.originalConsoleError) console.error = this.originalConsoleError
     if (this.removeResourceErrorListener) this.removeResourceErrorListener()
+    if (this.sessionReplay) this.sessionReplay.stop()
     this.attached = false
   }
 }

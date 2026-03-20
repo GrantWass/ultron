@@ -9,4 +9,7 @@ export default defineConfig({
   target: 'es2017',
   treeshake: true,
   sourcemap: false,
+  // Code-split on dynamic imports (ESM only) so rrweb is a separate chunk
+  // that is never fetched unless sessionReplay: true is set.
+  splitting: true,
 })

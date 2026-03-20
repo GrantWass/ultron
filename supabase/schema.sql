@@ -43,6 +43,48 @@ create table if not exists errors (
 -- alter table errors add column if not exists viewport text;
 -- alter table errors add column if not exists connection text;
 
+-- ============================================================
+-- SESSION RECORDINGS (for session replay feature)
+-- ============================================================
+
+-- Stores metadata for rrweb recordings uploaded to S3.
+-- The actual events are stored in S3 (key = s3_key).
+-- Configure an S3 lifecycle rule to delete objects after 7 days:
+--   Prefix: recordings/   Expiration: 7 days
+create table if not exists session_recordings (
+  id         uuid primary key,                        -- set by SDK (matches session_recording_id on errors)
+  project_id uuid references projects(id) on delete cascade not null,
+  session_id text not null,
+  s3_key     text not null,
+  duration_ms integer,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null default (now() + interval '7 days')
+);
+
+create index if not exists session_recordings_project_session
+  on session_recordings(project_id, session_id);
+
+alter table session_recordings enable row level security;
+
+create policy "Project owners can manage session recordings"
+  on session_recordings for all
+  using (get_project_owner(session_recordings.project_id) = auth.uid());
+
+create policy "Members can view session recordings"
+  on session_recordings for select
+  using (
+    exists (
+      select 1 from project_members
+      where project_members.project_id = session_recordings.project_id
+        and project_members.user_id = auth.uid()
+        and project_members.status = 'accepted'
+    )
+  );
+
+-- Link errors to their session recording (nullable — only set when sessionReplay is enabled)
+-- No FK constraint: recording upload is async and may arrive after the error row
+alter table errors add column if not exists session_recording_id uuid;
+
 -- Index for fast project error feeds sorted by time
 create index if not exists errors_project_id_created_at
   on errors(project_id, created_at desc);

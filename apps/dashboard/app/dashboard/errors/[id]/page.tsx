@@ -8,6 +8,7 @@ import type { ErrorWithProject } from '@ultron/types'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { Tip } from '@/components/tip'
+import { SessionReplayPlayer } from '@/components/session-replay-player'
 
 // ── Metadata helpers ──────────────────────────────────────────────────────────
 
@@ -484,6 +485,13 @@ export default async function ErrorDetailPage({
             {JSON.stringify(meta, null, 2)}
           </pre>
         </details>
+      )}
+
+      {/* Session replay — shown when a recording was captured for this event */}
+      {(rawError as { session_recording_id?: string | null }).session_recording_id && (
+        <SessionReplayPlayer
+          recordingId={(rawError as { session_recording_id: string }).session_recording_id}
+        />
       )}
 
       {/* AI fix suggestion — only for JS errors */}
