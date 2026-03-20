@@ -25,32 +25,24 @@ interface ConsoleReplayEvent {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function extractSideEvents(events: any[]): {
-  networkEvents: NetworkReplayEvent[]
-  consoleEvents: ConsoleReplayEvent[]
-} {
-  const networkEvents: NetworkReplayEvent[] = []
-  const consoleEvents: ConsoleReplayEvent[] = []
+function extractSideEvents(events: any[]): { network: NetworkReplayEvent[]; console: ConsoleReplayEvent[] } {
+  const network: NetworkReplayEvent[] = []
+  const console_: ConsoleReplayEvent[] = []
 
   for (const e of events) {
     if (e.type === CUSTOM_EVENT_TYPE && e.data?.tag === 'network') {
-      const p = e.data.payload
-      networkEvents.push({ timestamp: e.timestamp, ...p })
+      network.push({ timestamp: e.timestamp, ...e.data.payload })
     } else if (e.type === PLUGIN_EVENT_TYPE) {
       // rrweb console plugin — plugin name varies by version, handle both
       const pluginName: string = e.data?.plugin ?? ''
       if (pluginName.includes('console')) {
         const p = e.data?.payload
-        consoleEvents.push({
-          timestamp: e.timestamp,
-          level: p?.level ?? 'log',
-          payload: p?.payload ?? [],
-        })
+        console_.push({ timestamp: e.timestamp, level: p?.level ?? 'log', payload: p?.payload ?? [] })
       }
     }
   }
 
-  return { networkEvents, consoleEvents }
+  return { network, console: console_ }
 }
 
 function formatTs(baseTs: number, ts: number): string {
@@ -135,9 +127,11 @@ export function SessionReplayPlayer({ recordingId }: SessionReplayPlayerProps) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [errorMsg, setErrorMsg] = useState('')
   const [activeTab, setActiveTab] = useState<'network' | 'console'>('network')
-  const [networkEvents, setNetworkEvents] = useState<NetworkReplayEvent[]>([])
-  const [consoleEvents, setConsoleEvents] = useState<ConsoleReplayEvent[]>([])
-  const [baseTs, setBaseTs] = useState(0)
+  const [sideEvents, setSideEvents] = useState<{
+    network: NetworkReplayEvent[]
+    console: ConsoleReplayEvent[]
+    baseTs: number
+  }>({ network: [], console: [], baseTs: 0 })
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -156,11 +150,10 @@ export function SessionReplayPlayer({ recordingId }: SessionReplayPlayerProps) {
 
         if (destroyed) return
 
-        const { networkEvents: net, consoleEvents: con } = extractSideEvents(eventsRes.events)
-        const firstTs = eventsRes.events[0]?.timestamp ?? 0
-        setNetworkEvents(net)
-        setConsoleEvents(con)
-        setBaseTs(firstTs)
+        setSideEvents({
+          ...extractSideEvents(eventsRes.events),
+          baseTs: eventsRes.events[0]?.timestamp ?? 0,
+        })
 
         // rrweb-player mounts directly onto a DOM element
         const player = new RrwebPlayer({
@@ -192,8 +185,8 @@ export function SessionReplayPlayer({ recordingId }: SessionReplayPlayerProps) {
   }, [recordingId])
 
   const tabs: { key: 'network' | 'console'; label: string; count: number }[] = [
-    { key: 'network', label: 'Network', count: networkEvents.length },
-    { key: 'console', label: 'Console', count: consoleEvents.length },
+    { key: 'network', label: 'Network', count: sideEvents.network.length },
+    { key: 'console', label: 'Console', count: sideEvents.console.length },
   ]
 
   return (
@@ -243,8 +236,8 @@ export function SessionReplayPlayer({ recordingId }: SessionReplayPlayerProps) {
           {/* Panel content */}
           <div className="max-h-52 overflow-y-auto bg-background">
             {activeTab === 'network'
-              ? <NetworkPanel events={networkEvents} baseTs={baseTs} />
-              : <ConsolePanel events={consoleEvents} baseTs={baseTs} />
+              ? <NetworkPanel events={sideEvents.network} baseTs={sideEvents.baseTs} />
+              : <ConsolePanel events={sideEvents.console} baseTs={sideEvents.baseTs} />
             }
           </div>
         </div>

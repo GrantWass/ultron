@@ -137,7 +137,23 @@ function isCorsError(reqUrl: string, errStr: string): boolean {
 
 function shouldIgnore(reqUrl: string): boolean {
   if (!reqUrl || reqUrl === 'null' || reqUrl === 'undefined') return true
-  return reqUrl.includes('ultron.live/api/ingest')
+  return reqUrl.includes('ultron.live/api/ingest') || reqUrl.includes('ultron.live/api/session-replay')
+}
+
+// ── Replay event helper ───────────────────────────────────────────────────
+
+function emitReplayNetwork(
+  addReplayEvent: ((tag: string, payload: unknown) => void) | undefined,
+  method: string,
+  reqUrl: string,
+  status: number,
+  ok: boolean,
+  duration: number,
+  slow: boolean,
+  timestamp: number,
+  extra?: { error?: string; cors?: boolean },
+): void {
+  addReplayEvent?.('network', { method, url: formatUrl(reqUrl), status, ok, duration, slow, timestamp, ...extra })
 }
 
 // ── Fetch ─────────────────────────────────────────────────────────────────
@@ -171,15 +187,7 @@ export function monitorNetwork(
 
       // Inject every request into the replay stream so the network timeline
       // is complete, not just failures/slow requests.
-      addReplayEvent?.('network', {
-        method,
-        url: formatUrl(reqUrl),
-        status: response.status,
-        ok: response.ok,
-        duration,
-        slow,
-        timestamp: start,
-      })
+      emitReplayNetwork(addReplayEvent, method, reqUrl, response.status, response.ok, duration, slow, start)
 
       if (!response.ok || slow) {
         const status = response.ok ? 0 : response.status
@@ -218,16 +226,7 @@ export function monitorNetwork(
       const cors = isCorsError(reqUrl, errStr)
       const category = categorize(0, cors, false)
 
-      addReplayEvent?.('network', {
-        method,
-        url: formatUrl(reqUrl),
-        status: 0,
-        ok: false,
-        duration,
-        slow: false,
-        error: errStr,
-        timestamp: start,
-      })
+      emitReplayNetwork(addReplayEvent, method, reqUrl, 0, false, duration, false, start, { error: errStr })
 
       queue.enqueue(
         makePayload(
@@ -279,16 +278,7 @@ export function monitorNetwork(
         const slow = duration > threshold
         const cors = status === 0 && isCrossOrigin(reqUrl)
 
-        addReplayEvent?.('network', {
-          method,
-          url: formatUrl(reqUrl),
-          status,
-          ok: status >= 200 && status < 300,
-          duration,
-          slow,
-          cors,
-          timestamp: start,
-        })
+        emitReplayNetwork(addReplayEvent, method, reqUrl, status, status >= 200 && status < 300, duration, slow, start, cors ? { cors } : undefined)
 
         if (status === 0 || status >= 400 || slow) {
           const category = categorize(status, cors, slow)
