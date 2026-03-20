@@ -1,15 +1,78 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
+import { fingerprint } from '@/lib/fingerprint'
 import type { EventType } from '@ultron/types'
 
 export const dynamic = 'force-dynamic'
 
 type Bucket = { error: number; network: number; vital: number; resource_error: number }
 
+export interface HeatmapCell {
+  dow: number   // 0=Sun … 6=Sat
+  hour: number  // 0–23
+  count: number
+}
+
+export interface VitalSummary {
+  name: string
+  median: number
+  p75: number
+  rating: 'good' | 'needs-improvement' | 'poor'
+  good: number
+  needsImprovement: number
+  poor: number
+  total: number
+}
+
+export interface TopError {
+  fingerprint: string
+  message: string
+  count: number
+  first_seen: string
+  last_seen: string
+  sample_id: string
+  event_type: string
+}
+
 export interface AnalyticsResponse {
   timeline: Array<{ day: string; error: number; network: number; vital: number; resource_error: number; total: number }>
   totals: Bucket & { total: number }
   topBrowsers: Array<{ browser: string; count: number }>
+  heatmap: HeatmapCell[]
+  vitals: VitalSummary[]
+  topErrors: TopError[]
+}
+
+// Matches thresholds in apps/npm-package/src/vitals.ts
+const VITAL_THRESHOLDS: Record<string, [number, number]> = {
+  LCP:  [2500, 4000],
+  CLS:  [0.1, 0.25],
+  INP:  [200, 500],
+  FID:  [100, 300],
+  TTFB: [800, 1800],
+  FCP:  [1800, 3000],
+}
+const VITAL_ORDER = ['LCP', 'CLS', 'INP', 'FCP', 'TTFB', 'FID']
+
+function vitalRating(name: string, value: number): 'good' | 'needs-improvement' | 'poor' {
+  const t = VITAL_THRESHOLDS[name]
+  if (!t) return 'good'
+  if (value <= t[0]) return 'good'
+  if (value <= t[1]) return 'needs-improvement'
+  return 'poor'
+}
+
+function median(arr: number[]): number {
+  if (!arr.length) return 0
+  const s = [...arr].sort((a, b) => a - b)
+  const m = Math.floor(s.length / 2)
+  return s.length % 2 === 0 ? (s[m - 1] + s[m]) / 2 : s[m]
+}
+
+function p75(arr: number[]): number {
+  if (!arr.length) return 0
+  const s = [...arr].sort((a, b) => a - b)
+  return s[Math.floor(s.length * 0.75)] ?? s[s.length - 1]
 }
 
 export async function GET(request: Request) {
@@ -31,10 +94,9 @@ export async function GET(request: Request) {
   const days = Math.min(90, Math.max(1, parseInt(searchParams.get('days') ?? '30', 10)))
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
 
-  // Select only the fields needed for aggregation — keeps the payload small
   const { data, error } = await supabase
     .from('errors')
-    .select('created_at, event_type, browser')
+    .select('id, created_at, event_type, browser, message, metadata')
     .eq('project_id', projectId)
     .gte('created_at', since)
 
@@ -52,7 +114,6 @@ export async function GET(request: Request) {
     if (et in bucket) bucket[et]++
   }
 
-  // Fill every day in the window so the chart has no gaps
   const timeline: AnalyticsResponse['timeline'] = []
   const cursor = new Date(since)
   const now = new Date()
@@ -84,5 +145,64 @@ export async function GET(request: Request) {
     .slice(0, 5)
     .map(([browser, count]) => ({ browser, count }))
 
-  return NextResponse.json({ timeline, totals, topBrowsers } satisfies AnalyticsResponse)
+  // ── Heatmap (day-of-week × hour UTC) ─────────────────────────────────────
+  const heatmapMap = new Map<string, number>()
+  for (const row of rows) {
+    const d = new Date(row.created_at)
+    const key = `${d.getUTCDay()}:${d.getUTCHours()}`
+    heatmapMap.set(key, (heatmapMap.get(key) ?? 0) + 1)
+  }
+  const heatmap: HeatmapCell[] = []
+  for (let dow = 0; dow < 7; dow++) {
+    for (let hour = 0; hour < 24; hour++) {
+      heatmap.push({ dow, hour, count: heatmapMap.get(`${dow}:${hour}`) ?? 0 })
+    }
+  }
+
+  // ── Web vitals ───────────────────────────────────────────────────────────
+  type VEntry = { values: number[]; good: number; needsImprovement: number; poor: number }
+  const vitalsMap = new Map<string, VEntry>()
+  for (const row of rows) {
+    if (row.event_type !== 'vital') continue
+    const meta = row.metadata as { name?: string; value?: number; rating?: string } | null
+    if (!meta?.name || meta.value == null) continue
+    if (!vitalsMap.has(meta.name)) vitalsMap.set(meta.name, { values: [], good: 0, needsImprovement: 0, poor: 0 })
+    const e = vitalsMap.get(meta.name)!
+    e.values.push(meta.value as number)
+    const r = (meta.rating as string) || vitalRating(meta.name, meta.value as number)
+    if (r === 'good') e.good++
+    else if (r === 'needs-improvement') e.needsImprovement++
+    else e.poor++
+  }
+  const vitals: VitalSummary[] = Array.from(vitalsMap.entries())
+    .sort((a, b) => {
+      const ai = VITAL_ORDER.indexOf(a[0]); const bi = VITAL_ORDER.indexOf(b[0])
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
+    })
+    .map(([name, { values, good, needsImprovement, poor }]) => {
+      const p75val = p75(values)
+      return { name, median: median(values), p75: p75val, rating: vitalRating(name, p75val), good, needsImprovement, poor, total: values.length }
+    })
+
+  // ── Top errors by fingerprint ────────────────────────────────────────────
+  type FpEntry = { message: string; count: number; first_seen: string; last_seen: string; sample_id: string; event_type: string }
+  const fpMap = new Map<string, FpEntry>()
+  for (const row of rows) {
+    if (row.event_type === 'vital') continue
+    const fp = fingerprint(row.message)
+    const ex = fpMap.get(fp)
+    if (!ex) {
+      fpMap.set(fp, { message: row.message, count: 1, first_seen: row.created_at, last_seen: row.created_at, sample_id: row.id, event_type: row.event_type })
+    } else {
+      ex.count++
+      if (row.created_at < ex.first_seen) ex.first_seen = row.created_at
+      if (row.created_at > ex.last_seen) { ex.last_seen = row.created_at; ex.sample_id = row.id }
+    }
+  }
+  const topErrors: TopError[] = Array.from(fpMap.entries())
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 5)
+    .map(([fp, d]) => ({ fingerprint: fp, ...d }))
+
+  return NextResponse.json({ timeline, totals, topBrowsers, heatmap, vitals, topErrors } satisfies AnalyticsResponse)
 }

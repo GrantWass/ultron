@@ -5,6 +5,9 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
 import type { AnalyticsResponse } from '@/app/api/errors/analytics/route'
+import { HeatmapPanel } from '@/components/heatmap-panel'
+import { VitalsPanel } from '@/components/vitals-panel'
+import { TopErrorsPanel } from '@/components/top-errors-panel'
 
 const EVENT_COLORS = {
   error:          '#ef4444',
@@ -45,13 +48,17 @@ export function AnalyticsPanel({ projectId, days = 30 }: AnalyticsPanelProps) {
 
   if (loading) {
     return (
-      <div className="rounded-md border border-border p-6 animate-pulse bg-muted/30 h-48" />
+      <div className="space-y-3">
+        <div className="rounded-md border border-border p-6 animate-pulse bg-muted/30 h-48" />
+        <div className="rounded-md border border-border p-4 animate-pulse bg-muted/30 h-10" />
+        <div className="rounded-md border border-border p-6 animate-pulse bg-muted/30 h-48" />
+      </div>
     )
   }
 
   if (!data) return null
 
-  const { timeline, totals, topBrowsers } = data
+  const { timeline, totals, topBrowsers, heatmap, vitals, topErrors } = data
 
   // Only show ticks for the first, middle, and last data points to avoid crowding
   const tickIndices = new Set([0, Math.floor(timeline.length / 2), timeline.length - 1])
@@ -64,7 +71,10 @@ export function AnalyticsPanel({ projectId, days = 30 }: AnalyticsPanelProps) {
 
   return (
     <div className="space-y-4">
-      {/* Timeline chart + top browsers */}
+      {/* ── Web vitals (subtle pill row) ────────────────────────────────── */}
+      {vitals.length > 0 && <VitalsPanel vitals={vitals} />}
+
+      {/* ── Timeline chart + top browsers ───────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_200px] gap-3">
         {/* Stacked bar chart */}
         <div className="rounded-md border border-border bg-card p-4">
@@ -166,6 +176,12 @@ export function AnalyticsPanel({ projectId, days = 30 }: AnalyticsPanelProps) {
           )}
         </div>
       </div>
+
+      {/* ── Top errors by fingerprint ────────────────────────────────────── */}
+      <TopErrorsPanel errors={topErrors} projectId={projectId} />
+
+      {/* ── Error frequency heatmap ──────────────────────────────────────── */}
+      <HeatmapPanel cells={heatmap} />
     </div>
   )
 }
