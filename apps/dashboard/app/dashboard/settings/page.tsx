@@ -380,8 +380,9 @@ function SettingsContent() {
             <div className="px-4 py-3 space-y-2 text-xs text-muted-foreground">
               <p>
                 When an error fires, the last 30 seconds of the session are captured and playable in the error detail view.
-                rrweb is lazy-loaded — visitors who never trigger an error load nothing extra.
+                rrweb records continuously into a rolling buffer from page load — only the relevant clip is uploaded when an error occurs.
                 All input fields are masked by default.
+                Session replay is opt-in — just pass <span className="font-mono text-foreground/80">sessionReplay: true</span>. If you don&apos;t use it, rrweb is never fetched and adds nothing to your bundle.
               </p>
               <pre className="bg-muted rounded px-3 py-2 font-mono text-foreground/80 overflow-x-auto">{`// Simple — uses defaults (30s buffer, inputs masked)
 initTracker({
@@ -397,7 +398,7 @@ initTracker({
     maskAllInputs: true, // mask input values (default: true)
   },
 })`}</pre>
-              <p>Requires <span className="font-mono text-foreground/80">rrweb</span> to be installed in your project (<span className="font-mono text-foreground/80">npm install rrweb</span>).</p>
+              <p>rrweb is included with the tracker — no separate install needed.</p>
             </div>
           </div>
 
