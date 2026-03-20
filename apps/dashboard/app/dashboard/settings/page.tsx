@@ -6,7 +6,7 @@ import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Project } from '@ultron/types'
 import {
-  Key, Github, Copy, Check, ExternalLink, Code2, ChevronDown, LogOut, BookOpen,
+  Key, Github, Copy, Check, ExternalLink, Code2, ChevronDown, LogOut, BookOpen, Video,
 } from 'lucide-react'
 
 // ── SDK Setup ─────────────────────────────────────────────────────────────────
@@ -365,6 +365,39 @@ function SettingsContent() {
   apiKey: '...',
   reportAllVitals: true,
 })`}</pre>
+            </div>
+          </div>
+
+          {/* Session replay */}
+          <div className="rounded-md border border-border overflow-hidden">
+            <div className="px-4 py-2 border-b border-border bg-muted/50 flex items-center justify-between">
+              <span className="font-medium text-xs flex items-center gap-1.5">
+                <Video className="h-3.5 w-3.5 text-teal-500" />
+                Enable session replay
+              </span>
+              <span className="text-[11px] font-mono text-muted-foreground bg-muted px-2 py-0.5 rounded">sessionReplay</span>
+            </div>
+            <div className="px-4 py-3 space-y-2 text-xs text-muted-foreground">
+              <p>
+                When an error fires, the last 60 seconds of the user&apos;s session are recorded and playable in the error detail view.
+                rrweb is lazy-loaded — users who don&apos;t trigger an error pay zero cost.
+                All input fields are masked by default.
+              </p>
+              <pre className="bg-muted rounded px-3 py-2 font-mono text-foreground/80 overflow-x-auto">{`// Simple — uses defaults (60s buffer, inputs masked)
+initTracker({
+  apiKey: '...',
+  sessionReplay: true,
+})
+
+// Or customise the buffer window
+initTracker({
+  apiKey: '...',
+  sessionReplay: {
+    bufferSeconds: 30,   // record the last 30s (default: 60)
+    maskAllInputs: true, // mask input values (default: true)
+  },
+})`}</pre>
+              <p>Requires <span className="font-mono text-foreground/80">rrweb</span> to be installed in your project (<span className="font-mono text-foreground/80">npm install rrweb</span>) and AWS S3 configured in your dashboard environment.</p>
             </div>
           </div>
 

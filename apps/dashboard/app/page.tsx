@@ -1,7 +1,7 @@
 import { createServerClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import {
-  Zap, AlertCircle, Wifi, Activity, Wand2,
+  Zap, AlertCircle, Wifi, Activity, Wand2, Video,
   ArrowRight, Check, Package, Clock,
 } from 'lucide-react'
 
@@ -198,7 +198,7 @@ export default async function RootPage() {
             Most error tools were built for enterprise teams. Ultron was built for the developer actually shipping the code.
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[
               {
                 icon: <AlertCircle className="h-5 w-5 text-red-500" />,
@@ -217,6 +217,12 @@ export default async function RootPage() {
                 title: 'Web Vitals',
                 desc: 'LCP, FCP, CLS, INP and TTFB tracked out of the box. Pinpoint the exact element causing slowness, including navigation type and load time.',
                 color: 'border-purple-200 dark:border-purple-900/50',
+              },
+              {
+                icon: <Video className="h-5 w-5 text-teal-500" />,
+                title: 'Session Replay',
+                desc: 'See exactly what your user experienced. When an error fires, the last 60 seconds of their session are recorded and playable in your dashboard. Inputs masked by default.',
+                color: 'border-teal-200 dark:border-teal-900/50',
               },
               {
                 icon: <Wand2 className="h-5 w-5 text-primary" />,
@@ -257,7 +263,8 @@ export default async function RootPage() {
               ['Alerts with no guidance', 'AI fix suggestions tied to your source code'],
               ['$26–$80+/mo for small teams', 'Simple, affordable pricing'],
               ['Overwhelming UI built for enterprise', 'Clean dashboard built for developers'],
-              ['JS errors only (or pay more)', 'Errors + network + vitals in one'],
+              ['Session replay costs extra — or requires a pricier plan', 'Session replay built in, stored on your own S3'],
+              ['JS errors only (or pay more)', 'Errors + network + vitals + replay in one'],
             ].map(([them, us], i) => (
               <>
                 <div key={`them-${i}`} className="bg-background px-5 py-3 text-xs text-muted-foreground border-t border-border flex items-start gap-2">
