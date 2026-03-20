@@ -1,64 +1,61 @@
 'use client'
 
-import type { VitalSummary } from '@/app/api/errors/analytics/route'
+import type { PageVitalBad } from '@/app/api/errors/analytics/route'
+import { Info } from 'lucide-react'
 
-const RATING_PILL: Record<string, string> = {
-  'needs-improvement': 'border-amber-200 bg-amber-50  dark:border-amber-800 dark:bg-amber-950/30',
-  poor:                'border-red-200   bg-red-50    dark:border-red-800   dark:bg-red-950/30',
-}
-
-const RATING_VALUE: Record<string, string> = {
-  'needs-improvement': 'text-amber-700 dark:text-amber-400',
-  poor:                'text-red-700   dark:text-red-400',
-}
-
-const RATING_DOT: Record<string, string> = {
-  'needs-improvement': 'bg-amber-500',
-  poor:                'bg-red-500',
-}
-
-function fmt(name: string, value: number): string {
-  if (name === 'CLS') return value.toFixed(3)
-  if (value >= 1000) return `${(value / 1000).toFixed(1)}s`
-  return `${Math.round(value)}ms`
+const VITAL_PILL: Record<string, string> = {
+  poor:               'bg-red-100    text-red-700    dark:bg-red-950/40    dark:text-red-400',
+  'needs-improvement':'bg-amber-100  text-amber-700  dark:bg-amber-950/40  dark:text-amber-400',
 }
 
 interface VitalsPanelProps {
-  vitals: VitalSummary[]
+  pageVitals: PageVitalBad[]
 }
 
-export function VitalsPanel({ vitals }: VitalsPanelProps) {
-  if (vitals.length === 0) return null
-
+export function VitalsPanel({ pageVitals }: VitalsPanelProps) {
   return (
-    <div className="rounded-md border border-border bg-card px-4 py-3">
-      <div className="flex items-baseline justify-between mb-2.5">
-        <p className="text-xs font-medium text-muted-foreground">Web vitals · bad readings only</p>
-        <p className="text-[10px] text-muted-foreground">
-          enable <code className="font-mono">reportAllVitals</code> for full distribution
+    <div className="rounded-md border border-border bg-card px-4 py-3 space-y-3">
+      {/* Header with reportAllVitals tip */}
+      <div className="flex items-start justify-between gap-4">
+        <p className="text-xs font-medium text-muted-foreground">
+          Bad web vitals per page
+        </p>
+        <p className="flex items-center gap-1 text-[10px] text-muted-foreground shrink-0">
+          <Info className="h-3 w-3 shrink-0" />
+          Enable{' '}
+          <code className="font-mono">reportAllVitals: true</code>
+          {' '}for full distribution
         </p>
       </div>
-      <div className="flex flex-wrap gap-2">
-        {vitals.map((v) => {
-          const poorPct = v.total > 0 ? Math.round((v.poor / v.total) * 100) : 0
-          return (
-            <div
-              key={v.name}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs ${RATING_PILL[v.rating]}`}
-              title={`${v.name} — ${v.total} bad readings reported\n${v.needsImprovement} needs-improvement · ${v.poor} poor (${poorPct}%)\nmedian of bad samples: ${fmt(v.name, v.medianBad)}\n\nNote: only non-good readings are reported by default.\nEnable reportAllVitals for a true percentile.`}
-            >
-              <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${RATING_DOT[v.rating]}`} />
-              <span className="font-medium text-foreground">{v.name}</span>
-              <span className={`font-mono font-semibold tabular-nums ${RATING_VALUE[v.rating]}`}>
-                {fmt(v.name, v.medianBad)}
+
+      {/* Per-page list */}
+      {pageVitals.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No bad vital readings in this period.</p>
+      ) : (
+        <div className="space-y-2">
+          {pageVitals.map((page) => (
+            <div key={page.url} className="flex items-center gap-2 min-w-0">
+              <span
+                className="flex-1 truncate text-xs font-mono text-foreground min-w-0"
+                title={page.url}
+              >
+                {page.url}
               </span>
-              <span className="text-muted-foreground">
-                {v.total} bad
-              </span>
+              <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
+                {page.vitals.map((v) => (
+                  <span
+                    key={v.name}
+                    className={`rounded px-1.5 py-0.5 text-[10px] font-medium tabular-nums ${VITAL_PILL[v.hasPoor ? 'poor' : 'needs-improvement']}`}
+                    title={`${v.name}: ${v.count} ${v.hasPoor ? 'poor' : 'needs-improvement'} reading${v.count !== 1 ? 's' : ''}`}
+                  >
+                    {v.name} ×{v.count}
+                  </span>
+                ))}
+              </div>
             </div>
-          )
-        })}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

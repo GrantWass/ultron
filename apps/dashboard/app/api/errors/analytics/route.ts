@@ -13,16 +13,15 @@ export interface HeatmapCell {
   count: number
 }
 
-export interface VitalSummary {
-  name: string
-  /** Median value of reported (non-good) samples only — not a true population median */
-  medianBad: number
-  /** Dominant rating across reported samples */
-  rating: 'needs-improvement' | 'poor'
-  needsImprovement: number
-  poor: number
-  /** Total non-good samples reported in this window */
-  total: number
+export interface PageVitalBad {
+  /** Pathname extracted from the full URL */
+  url: string
+  vitals: Array<{
+    name: string
+    hasPoor: boolean   // true when any reading was 'poor' (vs needs-improvement only)
+    count: number
+  }>
+  total: number        // sum across all vitals for this page
 }
 
 export interface TopError {
@@ -40,7 +39,7 @@ export interface AnalyticsResponse {
   totals: Bucket & { total: number }
   topBrowsers: Array<{ browser: string; count: number }>
   heatmap: HeatmapCell[]
-  vitals: VitalSummary[]
+  pageVitals: PageVitalBad[]
   topErrors: TopError[]
 }
 
@@ -63,12 +62,6 @@ function vitalRating(name: string, value: number): 'good' | 'needs-improvement' 
   return 'poor'
 }
 
-function median(arr: number[]): number {
-  if (!arr.length) return 0
-  const s = [...arr].sort((a, b) => a - b)
-  const m = Math.floor(s.length / 2)
-  return s.length % 2 === 0 ? (s[m - 1] + s[m]) / 2 : s[m]
-}
 
 export async function GET(request: Request) {
   const supabase = await createServerClient()
@@ -91,7 +84,7 @@ export async function GET(request: Request) {
 
   const { data, error } = await supabase
     .from('errors')
-    .select('id, created_at, event_type, browser, message, metadata')
+    .select('id, created_at, event_type, browser, message, metadata, url')
     .eq('project_id', projectId)
     .gte('created_at', since)
 
@@ -154,35 +147,34 @@ export async function GET(request: Request) {
     }
   }
 
-  // ── Web vitals ───────────────────────────────────────────────────────────
-  // Only non-good samples reach the DB (SDK default: reportAllVitals = false).
-  // We therefore never count 'good' here — doing so would be a silent lie.
-  type VEntry = { values: number[]; needsImprovement: number; poor: number }
-  const vitalsMap = new Map<string, VEntry>()
+  // ── Bad web vitals per page ──────────────────────────────────────────────
+  // Only non-good samples reach the DB by default (SDK: reportAllVitals=false).
+  // Rather than computing misleading population percentiles, we group bad
+  // readings by page so the user can see which routes are problematic.
+  type VPageEntry = Map<string, { count: number; hasPoor: boolean }>
+  const pageVitalsMap = new Map<string, VPageEntry>()
   for (const row of rows) {
     if (row.event_type !== 'vital') continue
     const meta = row.metadata as { name?: string; value?: number; rating?: string } | null
-    if (!meta?.name || meta.value == null) continue
-    if (!vitalsMap.has(meta.name)) vitalsMap.set(meta.name, { values: [], needsImprovement: 0, poor: 0 })
-    const e = vitalsMap.get(meta.name)!
-    e.values.push(meta.value as number)
-    const r = (meta.rating as string) || vitalRating(meta.name, meta.value as number)
-    if (r === 'needs-improvement') e.needsImprovement++
-    else e.poor++
+    if (!meta?.name) continue
+    const r = (meta.rating as string) || (meta.value != null ? vitalRating(meta.name, meta.value as number) : 'poor')
+    if (r === 'good') continue
+    let pathname = row.url ?? '(unknown)'
+    try { pathname = new URL(pathname).pathname } catch { /* keep as-is */ }
+    if (!pageVitalsMap.has(pathname)) pageVitalsMap.set(pathname, new Map())
+    const byVital = pageVitalsMap.get(pathname)!
+    const prev = byVital.get(meta.name) ?? { count: 0, hasPoor: false }
+    byVital.set(meta.name, { count: prev.count + 1, hasPoor: prev.hasPoor || r === 'poor' })
   }
-  const vitals: VitalSummary[] = Array.from(vitalsMap.entries())
-    .sort((a, b) => {
-      const ai = VITAL_ORDER.indexOf(a[0]); const bi = VITAL_ORDER.indexOf(b[0])
-      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
+  const pageVitals: PageVitalBad[] = Array.from(pageVitalsMap.entries())
+    .map(([url, byVital]) => {
+      const vitals = Array.from(byVital.entries())
+        .sort((a, b) => VITAL_ORDER.indexOf(a[0]) - VITAL_ORDER.indexOf(b[0]))
+        .map(([name, { count, hasPoor }]) => ({ name, count, hasPoor }))
+      return { url, vitals, total: vitals.reduce((s, v) => s + v.count, 0) }
     })
-    .map(([name, { values, needsImprovement, poor }]) => {
-      // Only non-good samples reach the DB (SDK default). Avoid claiming a
-      // population-level percentile — instead expose the raw bad-sample counts
-      // and the median of those bad samples so the UI can present them honestly.
-      const total = needsImprovement + poor
-      const rating: VitalSummary['rating'] = poor >= needsImprovement ? 'poor' : 'needs-improvement'
-      return { name, medianBad: median(values), rating, needsImprovement, poor, total }
-    })
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 10)
 
   // ── Top errors by fingerprint ────────────────────────────────────────────
   type FpEntry = { message: string; count: number; first_seen: string; last_seen: string; sample_id: string; event_type: string }
@@ -204,5 +196,5 @@ export async function GET(request: Request) {
     .slice(0, 5)
     .map(([fp, d]) => ({ fingerprint: fp, ...d }))
 
-  return NextResponse.json({ timeline, totals, topBrowsers, heatmap, vitals, topErrors } satisfies AnalyticsResponse)
+  return NextResponse.json({ timeline, totals, topBrowsers, heatmap, pageVitals, topErrors } satisfies AnalyticsResponse)
 }

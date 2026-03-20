@@ -58,7 +58,7 @@ export function AnalyticsPanel({ projectId, days = 30 }: AnalyticsPanelProps) {
 
   if (!data) return null
 
-  const { timeline, totals, topBrowsers, heatmap, vitals, topErrors } = data
+  const { timeline, totals, topBrowsers, heatmap, pageVitals, topErrors } = data
 
   // Only show ticks for the first, middle, and last data points to avoid crowding
   const tickIndices = new Set([0, Math.floor(timeline.length / 2), timeline.length - 1])
@@ -71,8 +71,8 @@ export function AnalyticsPanel({ projectId, days = 30 }: AnalyticsPanelProps) {
 
   return (
     <div className="space-y-4">
-      {/* ── Web vitals (subtle pill row) ────────────────────────────────── */}
-      {vitals.length > 0 && <VitalsPanel vitals={vitals} />}
+      {/* ── Bad web vitals per page ─────────────────────────────────────── */}
+      <VitalsPanel pageVitals={pageVitals} />
 
       {/* ── Timeline chart + top browsers ───────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_200px] gap-3">
