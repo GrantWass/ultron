@@ -12,11 +12,18 @@ const CHECKOUT_INTERVAL_MS = 60_000
 const MAX_BUFFER_EVENTS = 10_000
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+type RrwebRecord = ((opts: any) => (() => void) | undefined) & {
+  addCustomEvent?: (tag: string, payload: unknown) => void
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type RrwebEvent = { type: number; data: unknown; timestamp: number; [k: string]: any }
 
 export interface SessionReplayHandle {
   /** Snapshot the current buffer, generate a recording ID, fire-and-forget upload. */
   captureSnapshot(): string
+  /** Inject a custom event into the rrweb stream (e.g. network or console events). */
+  addCustomEvent(tag: string, payload: unknown): void
   stop(): void
 }
 
@@ -26,11 +33,14 @@ export async function initSessionReplay(
   bufferSeconds: number,
   maskAllInputs: boolean,
 ): Promise<SessionReplayHandle | null> {
+  let record: RrwebRecord | undefined
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let recordFn: ((opts: any) => (() => void) | undefined) | undefined
+  let getRecordConsolePlugin: (() => any) | undefined
   try {
     const mod = await import('rrweb')
-    recordFn = mod.record
+    record = mod.record as RrwebRecord
+    // rrweb 2.x re-exports this from @rrweb/rrweb-plugin-console-record
+    getRecordConsolePlugin = (mod as Record<string, unknown>).getRecordConsolePlugin as typeof getRecordConsolePlugin
   } catch {
     console.warn('[Ultron] Session replay requires rrweb. Run: npm install rrweb')
     return null
@@ -39,7 +49,12 @@ export async function initSessionReplay(
   const bufferMs = bufferSeconds * 1000
   let buffer: RrwebEvent[] = []
 
-  const stop = recordFn({
+  const plugins: unknown[] = []
+  if (typeof getRecordConsolePlugin === 'function') {
+    plugins.push(getRecordConsolePlugin())
+  }
+
+  const stop = record({
     emit(event: RrwebEvent, isCheckout?: boolean) {
       if (isCheckout) {
         // New full snapshot arrived — drop events older than bufferMs
@@ -55,6 +70,7 @@ export async function initSessionReplay(
     },
     maskAllInputs,
     checkoutEveryNms: CHECKOUT_INTERVAL_MS,
+    plugins,
   })
 
   return {
@@ -65,6 +81,9 @@ export async function initSessionReplay(
       const endTs = events[events.length - 1]?.timestamp ?? Date.now()
       void sendRecording(apiKey, sessionId, recordingId, events, endTs - startTs)
       return recordingId
+    },
+    addCustomEvent(tag: string, payload: unknown): void {
+      record?.addCustomEvent?.(tag, payload)
     },
     stop: stop ?? (() => {}),
   }

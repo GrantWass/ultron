@@ -32,7 +32,12 @@ export class UltronTracker {
     this.attachErrorListeners()
     this.patchConsoleError()
     this.removeResourceErrorListener = monitorResourceErrors(this.queue, this.config)
-    monitorNetwork(this.queue, this.config)
+    // Pass a lazy callback so network events are forwarded into the rrweb stream
+    // once session replay has initialised. Events fired before init completes are
+    // silently dropped (the async gap is typically < 100 ms).
+    monitorNetwork(this.queue, this.config, (tag, payload) => {
+      this.sessionReplay?.addCustomEvent(tag, payload)
+    })
     collectVitals(this.queue, this.config)
     this.queue.start()
 

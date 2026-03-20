@@ -142,7 +142,11 @@ function shouldIgnore(reqUrl: string): boolean {
 
 // ── Fetch ─────────────────────────────────────────────────────────────────
 
-export function monitorNetwork(queue: ErrorQueue, config: TrackerConfig): void {
+export function monitorNetwork(
+  queue: ErrorQueue,
+  config: TrackerConfig,
+  addReplayEvent?: (tag: string, payload: unknown) => void,
+): void {
   const threshold = config.slowRequestThreshold ?? 3000
 
   const origFetch = window.fetch.bind(window)
@@ -164,6 +168,18 @@ export function monitorNetwork(queue: ErrorQueue, config: TrackerConfig): void {
       const response = await origFetch(input, init)
       const duration = Date.now() - start
       const slow = duration > threshold
+
+      // Inject every request into the replay stream so the network timeline
+      // is complete, not just failures/slow requests.
+      addReplayEvent?.('network', {
+        method,
+        url: formatUrl(reqUrl),
+        status: response.status,
+        ok: response.ok,
+        duration,
+        slow,
+        timestamp: start,
+      })
 
       if (!response.ok || slow) {
         const status = response.ok ? 0 : response.status
@@ -201,6 +217,18 @@ export function monitorNetwork(queue: ErrorQueue, config: TrackerConfig): void {
       const errStr = String(err)
       const cors = isCorsError(reqUrl, errStr)
       const category = categorize(0, cors, false)
+
+      addReplayEvent?.('network', {
+        method,
+        url: formatUrl(reqUrl),
+        status: 0,
+        ok: false,
+        duration,
+        slow: false,
+        error: errStr,
+        timestamp: start,
+      })
+
       queue.enqueue(
         makePayload(
           buildMessage(method, reqUrl, 0, duration, category),
@@ -250,6 +278,17 @@ export function monitorNetwork(queue: ErrorQueue, config: TrackerConfig): void {
         const status: number = this.status
         const slow = duration > threshold
         const cors = status === 0 && isCrossOrigin(reqUrl)
+
+        addReplayEvent?.('network', {
+          method,
+          url: formatUrl(reqUrl),
+          status,
+          ok: status >= 200 && status < 300,
+          duration,
+          slow,
+          cors,
+          timestamp: start,
+        })
 
         if (status === 0 || status >= 400 || slow) {
           const category = categorize(status, cors, slow)
