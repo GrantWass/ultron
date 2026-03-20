@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 
-export const dynamic = 'force-dynamic'
 
 // DELETE /api/projects/[id]/members/[memberId] — remove member (owner only)
 export async function DELETE(

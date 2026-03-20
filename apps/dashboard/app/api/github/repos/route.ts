@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { decrypt } from '@/lib/crypto'
 
-export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 export async function GET(request: Request) {
@@ -42,6 +41,7 @@ export async function GET(request: Request) {
   const repos = await res.json() as { full_name: string; owner: { login: string }; name: string; private: boolean }[]
 
   return NextResponse.json(
-    repos.map((r) => ({ full_name: r.full_name, owner: r.owner.login, name: r.name, private: r.private }))
+    repos.map((r) => ({ full_name: r.full_name, owner: r.owner.login, name: r.name, private: r.private })),
+    { headers: { 'Cache-Control': 'private, max-age=300, stale-while-revalidate=600' } },
   )
 }

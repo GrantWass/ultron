@@ -5,7 +5,6 @@ import { parseStackTrace, extractSearchKeywords } from '@/lib/stack-parser'
 import { fetchGitHubFiles, searchAndFetchGitHubFiles } from '@/lib/github'
 import type { ErrorRecord, ErrorWithProjectAndGitHub, RelevantFile } from '@ultron/types'
 
-export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 const openai = createOpenAI({

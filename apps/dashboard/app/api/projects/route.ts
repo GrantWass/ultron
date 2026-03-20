@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServerClient } from '@/lib/supabase/server'
 
-export const dynamic = 'force-dynamic'
 
 const CreateProjectSchema = z.object({
   name: z.string().min(1).max(100),
@@ -13,20 +12,15 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // Owned projects
-  const { data: owned, error: ownedError } = await supabase
-    .from('projects')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
+  // Owned projects + member rows in parallel
+  const [
+    { data: owned, error: ownedError },
+    { data: memberRows },
+  ] = await Promise.all([
+    supabase.from('projects').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+    supabase.from('project_members').select('project_id').eq('user_id', user.id).eq('status', 'accepted'),
+  ])
   if (ownedError) return NextResponse.json({ error: ownedError.message }, { status: 500 })
-
-  // Shared projects (accepted member)
-  const { data: memberRows } = await supabase
-    .from('project_members')
-    .select('project_id')
-    .eq('user_id', user.id)
-    .eq('status', 'accepted')
 
   const sharedIds = (memberRows ?? []).map((r) => r.project_id)
   const { data: shared } = sharedIds.length

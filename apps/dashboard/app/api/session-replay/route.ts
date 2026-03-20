@@ -5,7 +5,6 @@ import { gzipSync } from 'zlib'
 import { ingestRatelimit } from '@/lib/redis'
 import { uploadRecording, S3_BUCKET } from '@/lib/s3'
 
-export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 const CORS_HEADERS = {
@@ -83,15 +82,16 @@ export async function POST(request: Request) {
   const s3Key = `recordings/${project.id}/${session_id}/${session_recording_id}.json.gz`
   const compressed = gzipSync(Buffer.from(JSON.stringify(events)))
 
-  await uploadRecording(s3Key, compressed)
-
-  const { error: dbError } = await supabase.from('session_recordings').insert({
-    id: session_recording_id,
-    project_id: project.id,
-    session_id,
-    s3_key: s3Key,
-    duration_ms,
-  })
+  const [, { error: dbError }] = await Promise.all([
+    uploadRecording(s3Key, compressed),
+    supabase.from('session_recordings').insert({
+      id: session_recording_id,
+      project_id: project.id,
+      session_id,
+      s3_key: s3Key,
+      duration_ms,
+    }),
+  ])
 
   if (dbError) {
     console.error('session_recordings insert error:', dbError)

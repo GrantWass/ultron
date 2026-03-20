@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 
-export const dynamic = 'force-dynamic'
 
 // Called by Vercel cron (vercel.json) to delete errors older than 30 days.
 // Also callable manually by authenticated users.

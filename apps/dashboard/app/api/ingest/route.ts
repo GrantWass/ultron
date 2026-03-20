@@ -5,7 +5,6 @@ import { ingestRatelimit } from '@/lib/redis'
 import { fingerprint } from '@/lib/fingerprint'
 import type { IngestPayload } from '@ultron/types'
 
-export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 const CORS_HEADERS = {

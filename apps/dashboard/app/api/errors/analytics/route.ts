@@ -3,7 +3,6 @@ import { createServerClient } from '@/lib/supabase/server'
 import { fingerprint } from '@/lib/fingerprint'
 import type { EventType } from '@ultron/types'
 
-export const dynamic = 'force-dynamic'
 
 type Bucket = { error: number; network: number; vital: number; resource_error: number }
 
@@ -241,5 +240,7 @@ export async function GET(request: Request) {
     .slice(0, 5)
     .map(([fp, d]) => ({ fingerprint: fp, ...d }))
 
-  return NextResponse.json({ timeline, totals, topBrowsers, heatmap, hasFullVitals, vitalSummaries, pageVitals, topErrors } satisfies AnalyticsResponse)
+  return NextResponse.json({ timeline, totals, topBrowsers, heatmap, hasFullVitals, vitalSummaries, pageVitals, topErrors } satisfies AnalyticsResponse, {
+    headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' },
+  })
 }

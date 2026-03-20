@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerClient, createServiceRoleClient } from '@/lib/supabase/server'
 
-export const dynamic = 'force-dynamic'
 
 // GET /api/invite/[token] — public: return invite info for the acceptance page
 export async function GET(

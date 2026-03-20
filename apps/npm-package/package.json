@@ -31,10 +31,10 @@
     "access": "public"
   },
   "dependencies": {
-    "rrweb": "^2.0.0"
+    "rrweb": "2.0.0-alpha.4"
   },
   "peerDependencies": {
-    "rrweb": "^2.0.0"
+    "rrweb": "2.0.0-alpha.4"
   },
   "peerDependenciesMeta": {
     "rrweb": { "optional": true }

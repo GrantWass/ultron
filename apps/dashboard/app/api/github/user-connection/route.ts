@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 
-export const dynamic = 'force-dynamic'
 
 // Get current user's GitHub connection status
 export async function GET() {
