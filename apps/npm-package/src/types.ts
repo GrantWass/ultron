@@ -1,8 +1,6 @@
 export interface SessionReplayConfig {
   /** Seconds of activity to buffer before an error. Default: 30 */
   bufferSeconds?: number
-  /** Mask all input field values. Default: true */
-  maskAllInputs?: boolean
 }
 
 export interface TrackerConfig {

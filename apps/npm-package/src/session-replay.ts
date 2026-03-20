@@ -23,8 +23,7 @@ export interface SessionReplayHandle {
 export async function initSessionReplay(
   apiKey: string,
   sessionId: string,
-  bufferSeconds: number,
-  maskAllInputs: boolean,
+  bufferSeconds: number
 ): Promise<SessionReplayHandle | null> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let recordFn: ((opts: any) => (() => void) | undefined) | undefined
@@ -53,7 +52,7 @@ export async function initSessionReplay(
         buffer = buffer.slice(-MAX_BUFFER_EVENTS / 2)
       }
     },
-    maskAllInputs,
+    maskAllInputs: true,
     checkoutEveryNms: CHECKOUT_INTERVAL_MS,
   })
 

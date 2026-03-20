@@ -394,8 +394,7 @@ initTracker({
 initTracker({
   apiKey: '...',
   sessionReplay: {
-    bufferSeconds: 60,   // record the last 60s (default: 30)
-    maskAllInputs: true, // mask input values (default: true)
+    bufferSeconds: 60   // record the last 60s (default: 30)
   },
 })`}</pre>
               <p>rrweb is included with the tracker — no separate install needed.</p>
