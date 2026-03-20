@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import type { ProjectWithOwnerFlag } from '@ultron/types'
-import { AlertCircle, FolderOpen, Settings, Zap, Users, Mail, SlidersHorizontal } from 'lucide-react'
+import { AlertCircle, FolderOpen, Settings, Zap, Users, Mail, SlidersHorizontal, BarChart2 } from 'lucide-react'
 import React from 'react'
 
 interface PendingInvite {
@@ -68,19 +68,34 @@ export function Sidebar({ projects, currentProjectId, pendingInvites, isOpen, on
             </Link>
 
             {activeProjectId === project.id && (
-              <Link
-                href={`/dashboard/projects/${project.id}/settings`}
-                onClick={onClose}
-                className={cn(
-                  'flex items-center gap-1.5 rounded-md pl-5 pr-2 py-1 text-xs transition-colors ml-1 border-l-2',
-                  pathname === `/dashboard/projects/${project.id}/settings`
-                    ? 'border-primary bg-primary/10 text-primary font-medium'
-                    : 'border-primary/30 text-muted-foreground hover:bg-accent hover:text-accent-foreground hover:border-primary/60'
-                )}
-              >
-                <SlidersHorizontal className="h-3 w-3 shrink-0" />
-                <span>Settings</span>
-              </Link>
+              <>
+                <Link
+                  href={`/dashboard/projects/${project.id}/analytics`}
+                  onClick={onClose}
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-md pl-5 pr-2 py-1 text-xs transition-colors ml-1 border-l-2',
+                    pathname === `/dashboard/projects/${project.id}/analytics`
+                      ? 'border-primary bg-primary/10 text-primary font-medium'
+                      : 'border-primary/30 text-muted-foreground hover:bg-accent hover:text-accent-foreground hover:border-primary/60'
+                  )}
+                >
+                  <BarChart2 className="h-3 w-3 shrink-0" />
+                  <span>Analytics</span>
+                </Link>
+                <Link
+                  href={`/dashboard/projects/${project.id}/settings`}
+                  onClick={onClose}
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-md pl-5 pr-2 py-1 text-xs transition-colors ml-1 border-l-2',
+                    pathname === `/dashboard/projects/${project.id}/settings`
+                      ? 'border-primary bg-primary/10 text-primary font-medium'
+                      : 'border-primary/30 text-muted-foreground hover:bg-accent hover:text-accent-foreground hover:border-primary/60'
+                  )}
+                >
+                  <SlidersHorizontal className="h-3 w-3 shrink-0" />
+                  <span>Settings</span>
+                </Link>
+              </>
             )}
           </React.Fragment>
         ))}

@@ -1,7 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import { createServerClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { ErrorTable } from '@/components/error-table'
-import { AnalyticsPanel } from '@/components/analytics-panel'
 import type { Project } from '@ultron/types'
 
 export default async function ProjectErrorsPage({
@@ -54,13 +53,10 @@ export default async function ProjectErrorsPage({
       <div className="mb-6">
         <h1 className="text-xl font-semibold">{(project as Project).name}</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Error feed — click any error for details and AI fix suggestions
+          Error feed — click any error for details and AI fix suggestions. View the <a href={`/dashboard/projects/${id}/analytics`} className="underline underline-offset-2 hover:text-foreground transition-colors">Analytics</a> tab for trends.
         </p>
       </div>
-      <AnalyticsPanel projectId={id} />
-      <div className="mt-6">
-        <ErrorTable projectId={id} projects={allProjects ?? []} />
-      </div>
+      <ErrorTable projectId={id} projects={allProjects ?? []} />
     </div>
   )
 }
