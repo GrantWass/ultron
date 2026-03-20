@@ -69,6 +69,29 @@ export async function initSessionReplay(
   }
 }
 
+async function gzipJson(data: unknown): Promise<Uint8Array | null> {
+  try {
+    const json = JSON.stringify(data)
+    const stream = new CompressionStream('gzip')
+    const writer = stream.writable.getWriter()
+    writer.write(new TextEncoder().encode(json))
+    writer.close()
+    const chunks: Uint8Array[] = []
+    const reader = stream.readable.getReader()
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      chunks.push(value)
+    }
+    const out = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0))
+    let offset = 0
+    for (const chunk of chunks) { out.set(chunk, offset); offset += chunk.length }
+    return out
+  } catch {
+    return null
+  }
+}
+
 async function sendRecording(
   apiKey: string,
   sessionId: string,
@@ -77,12 +100,23 @@ async function sendRecording(
   durationMs: number,
 ): Promise<void> {
   try {
-    await fetch(SESSION_REPLAY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
-      body: JSON.stringify({ session_recording_id: recordingId, session_id: sessionId, events, duration_ms: durationMs }),
-      keepalive: true,
-    })
+    const compressed = await gzipJson({ session_recording_id: recordingId, session_id: sessionId, events, duration_ms: durationMs })
+    if (compressed) {
+      await fetch(SESSION_REPLAY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Encoding': 'gzip', 'x-api-key': apiKey },
+        body: new Blob([compressed.buffer as ArrayBuffer], { type: 'application/octet-stream' }),
+        keepalive: true,
+      })
+    } else {
+      // Fallback: send uncompressed (keepalive may drop if too large)
+      await fetch(SESSION_REPLAY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+        body: JSON.stringify({ session_recording_id: recordingId, session_id: sessionId, events, duration_ms: durationMs }),
+        keepalive: true,
+      })
+    }
   } catch {
     // best-effort — never throw from a monitoring SDK
   }
