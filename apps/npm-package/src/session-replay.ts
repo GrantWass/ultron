@@ -101,22 +101,13 @@ async function sendRecording(
 ): Promise<void> {
   try {
     const compressed = await gzipJson({ session_recording_id: recordingId, session_id: sessionId, events, duration_ms: durationMs })
-    if (compressed) {
-      await fetch(SESSION_REPLAY_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Content-Encoding': 'gzip', 'x-api-key': apiKey },
-        body: new Blob([compressed.buffer as ArrayBuffer], { type: 'application/octet-stream' }),
-        keepalive: true,
-      })
-    } else {
-      // Fallback: send uncompressed (keepalive may drop if too large)
-      await fetch(SESSION_REPLAY_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
-        body: JSON.stringify({ session_recording_id: recordingId, session_id: sessionId, events, duration_ms: durationMs }),
-        keepalive: true,
-      })
-    }
+    if (!compressed) return
+    await fetch(SESSION_REPLAY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Encoding': 'gzip', 'x-api-key': apiKey },
+      body: new Blob([compressed.buffer as ArrayBuffer], { type: 'application/octet-stream' }),
+      keepalive: true,
+    })
   } catch {
     // best-effort — never throw from a monitoring SDK
   }

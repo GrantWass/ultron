@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServerClient } from '@supabase/ssr'
-import { gzipSync } from 'zlib'
+import { gzipSync, gunzipSync } from 'zlib'
 import { ingestRatelimit } from '@/lib/redis'
 import { uploadRecording, S3_BUCKET } from '@/lib/s3'
 
@@ -38,7 +38,13 @@ export async function POST(request: Request) {
 
   let body: unknown
   try {
-    body = await request.json()
+    if (request.headers.get('content-encoding') === 'gzip') {
+      const buf = await request.arrayBuffer()
+      const decompressed = gunzipSync(Buffer.from(buf)).toString('utf-8')
+      body = JSON.parse(decompressed)
+    } else {
+      body = await request.json()
+    }
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400, headers: CORS_HEADERS })
   }
