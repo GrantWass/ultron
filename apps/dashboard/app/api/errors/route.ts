@@ -53,6 +53,8 @@ export async function GET(request: Request) {
   if (search)     query = query.ilike('message', `%${search}%`)
   if (url)        query = query.ilike('url', `%${url}%`)
   if (eventType)  query = query.eq('event_type', eventType)
+  // Never show 'good' vital readings in the feed — they belong in the analytics tab
+  query = query.or('event_type.neq.vital,metadata->>rating.is.null,metadata->>rating.neq.good')
   if (browser)    query = query.ilike('browser', `%${browser}%`)
   if (os)         query = query.ilike('os', `%${os}%`)
   if (connection) query = query.eq('connection', connection)
