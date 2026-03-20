@@ -15,12 +15,13 @@ export interface HeatmapCell {
 
 export interface VitalSummary {
   name: string
-  median: number
-  p75: number
-  rating: 'good' | 'needs-improvement' | 'poor'
-  good: number
+  /** Median value of reported (non-good) samples only — not a true population median */
+  medianBad: number
+  /** Dominant rating across reported samples */
+  rating: 'needs-improvement' | 'poor'
   needsImprovement: number
   poor: number
+  /** Total non-good samples reported in this window */
   total: number
 }
 
@@ -67,12 +68,6 @@ function median(arr: number[]): number {
   const s = [...arr].sort((a, b) => a - b)
   const m = Math.floor(s.length / 2)
   return s.length % 2 === 0 ? (s[m - 1] + s[m]) / 2 : s[m]
-}
-
-function p75(arr: number[]): number {
-  if (!arr.length) return 0
-  const s = [...arr].sort((a, b) => a - b)
-  return s[Math.floor(s.length * 0.75)] ?? s[s.length - 1]
 }
 
 export async function GET(request: Request) {
@@ -160,18 +155,19 @@ export async function GET(request: Request) {
   }
 
   // ── Web vitals ───────────────────────────────────────────────────────────
-  type VEntry = { values: number[]; good: number; needsImprovement: number; poor: number }
+  // Only non-good samples reach the DB (SDK default: reportAllVitals = false).
+  // We therefore never count 'good' here — doing so would be a silent lie.
+  type VEntry = { values: number[]; needsImprovement: number; poor: number }
   const vitalsMap = new Map<string, VEntry>()
   for (const row of rows) {
     if (row.event_type !== 'vital') continue
     const meta = row.metadata as { name?: string; value?: number; rating?: string } | null
     if (!meta?.name || meta.value == null) continue
-    if (!vitalsMap.has(meta.name)) vitalsMap.set(meta.name, { values: [], good: 0, needsImprovement: 0, poor: 0 })
+    if (!vitalsMap.has(meta.name)) vitalsMap.set(meta.name, { values: [], needsImprovement: 0, poor: 0 })
     const e = vitalsMap.get(meta.name)!
     e.values.push(meta.value as number)
     const r = (meta.rating as string) || vitalRating(meta.name, meta.value as number)
-    if (r === 'good') e.good++
-    else if (r === 'needs-improvement') e.needsImprovement++
+    if (r === 'needs-improvement') e.needsImprovement++
     else e.poor++
   }
   const vitals: VitalSummary[] = Array.from(vitalsMap.entries())
@@ -179,9 +175,13 @@ export async function GET(request: Request) {
       const ai = VITAL_ORDER.indexOf(a[0]); const bi = VITAL_ORDER.indexOf(b[0])
       return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
     })
-    .map(([name, { values, good, needsImprovement, poor }]) => {
-      const p75val = p75(values)
-      return { name, median: median(values), p75: p75val, rating: vitalRating(name, p75val), good, needsImprovement, poor, total: values.length }
+    .map(([name, { values, needsImprovement, poor }]) => {
+      // Only non-good samples reach the DB (SDK default). Avoid claiming a
+      // population-level percentile — instead expose the raw bad-sample counts
+      // and the median of those bad samples so the UI can present them honestly.
+      const total = needsImprovement + poor
+      const rating: VitalSummary['rating'] = poor >= needsImprovement ? 'poor' : 'needs-improvement'
+      return { name, medianBad: median(values), rating, needsImprovement, poor, total }
     })
 
   // ── Top errors by fingerprint ────────────────────────────────────────────
