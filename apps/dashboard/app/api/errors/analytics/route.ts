@@ -203,7 +203,7 @@ export async function GET(request: Request) {
       const r = (meta.rating as string) || (meta.value != null ? vitalRating(meta.name, meta.value as number) : 'poor')
       if (r === 'good') continue
       let pathname = row.url ?? '(unknown)'
-      try { pathname = new URL(pathname).pathname } catch { /* keep as-is */ }
+      try { pathname = fingerprint(new URL(pathname).pathname) } catch { /* keep as-is */ }
       if (!pageVitalsMap.has(pathname)) pageVitalsMap.set(pathname, new Map())
       const byVital = pageVitalsMap.get(pathname)!
       const prev = byVital.get(meta.name) ?? { count: 0, hasPoor: false }
