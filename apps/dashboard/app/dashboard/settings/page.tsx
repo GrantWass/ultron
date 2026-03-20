@@ -379,11 +379,12 @@ function SettingsContent() {
             </div>
             <div className="px-4 py-3 space-y-2 text-xs text-muted-foreground">
               <p>
-                When an error fires, the last 60 seconds of the user&apos;s session are recorded and playable in the error detail view.
-                rrweb is lazy-loaded — users who don&apos;t trigger an error pay zero cost.
+                When an error fires, the last 30 seconds of the session are captured and playable in the error detail view.
+                rrweb records continuously into a rolling buffer from page load — only the relevant clip is uploaded when an error occurs.
                 All input fields are masked by default.
+                Session replay is opt-in — just pass <span className="font-mono text-foreground/80">sessionReplay: true</span>. If you don&apos;t use it, rrweb is never fetched and adds nothing to your bundle.
               </p>
-              <pre className="bg-muted rounded px-3 py-2 font-mono text-foreground/80 overflow-x-auto">{`// Simple — uses defaults (60s buffer, inputs masked)
+              <pre className="bg-muted rounded px-3 py-2 font-mono text-foreground/80 overflow-x-auto">{`// Simple — uses defaults (30s buffer, inputs masked)
 initTracker({
   apiKey: '...',
   sessionReplay: true,
@@ -393,11 +394,10 @@ initTracker({
 initTracker({
   apiKey: '...',
   sessionReplay: {
-    bufferSeconds: 30,   // record the last 30s (default: 60)
-    maskAllInputs: true, // mask input values (default: true)
+    bufferSeconds: 60   // record the last 60s (default: 30)
   },
 })`}</pre>
-              <p>Requires <span className="font-mono text-foreground/80">rrweb</span> to be installed in your project (<span className="font-mono text-foreground/80">npm install rrweb</span>) and AWS S3 configured in your dashboard environment.</p>
+              <p>rrweb is included with the tracker — no separate install needed.</p>
             </div>
           </div>
 

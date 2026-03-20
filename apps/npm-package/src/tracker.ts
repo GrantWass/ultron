@@ -46,8 +46,7 @@ export class UltronTracker {
       void initSessionReplay(
         this.config.apiKey,
         getSessionId(),
-        replayCfg.bufferSeconds ?? 60,
-        replayCfg.maskAllInputs ?? true,
+        replayCfg.bufferSeconds ?? 30,
       ).then((handle) => { this.sessionReplay = handle })
     }
 

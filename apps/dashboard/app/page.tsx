@@ -198,7 +198,7 @@ export default async function RootPage() {
             Most error tools were built for enterprise teams. Ultron was built for the developer actually shipping the code.
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="flex flex-wrap justify-center gap-4">
             {[
               {
                 icon: <AlertCircle className="h-5 w-5 text-red-500" />,
@@ -221,7 +221,7 @@ export default async function RootPage() {
               {
                 icon: <Video className="h-5 w-5 text-teal-500" />,
                 title: 'Session Replay',
-                desc: 'See exactly what your user experienced. When an error fires, the last 60 seconds of their session are recorded and playable in your dashboard. Inputs masked by default.',
+                desc: 'See exactly what your user experienced. When an error fires, the last 30 seconds of their session are captured and playable in your dashboard. Inputs masked by default.',
                 color: 'border-teal-200 dark:border-teal-900/50',
               },
               {
@@ -231,7 +231,7 @@ export default async function RootPage() {
                 color: 'border-blue-200 dark:border-blue-900/50',
               },
             ].map(({ icon, title, desc, color }) => (
-              <div key={title} className={`rounded-xl border ${color} bg-card p-5 space-y-3`}>
+              <div key={title} className={`w-full sm:w-[calc(50%-8px)] lg:w-[calc(33.333%-11px)] rounded-xl border ${color} bg-card p-5 space-y-3`}>
                 <div className="flex items-center gap-2">
                   {icon}
                   <h3 className="text-sm font-semibold">{title}</h3>
@@ -263,7 +263,7 @@ export default async function RootPage() {
               ['Alerts with no guidance', 'AI fix suggestions tied to your source code'],
               ['$26–$80+/mo for small teams', 'Simple, affordable pricing'],
               ['Overwhelming UI built for enterprise', 'Clean dashboard built for developers'],
-              ['Session replay costs extra — or requires a pricier plan', 'Session replay built in, stored on your own S3'],
+              ['Session replay costs extra — or requires a pricier plan', 'Session replay built in, no extra setup required'],
               ['JS errors only (or pay more)', 'Errors + network + vitals + replay in one'],
             ].map(([them, us], i) => (
               <>

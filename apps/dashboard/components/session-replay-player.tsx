@@ -140,6 +140,8 @@ export function SessionReplayPlayer({ recordingId }: SessionReplayPlayerProps) {
 
     async function load() {
       try {
+        // @ts-expect-error — CSS module, no type definition needed
+        await import('rrweb-player/dist/style.css')
         const [eventsRes, { default: RrwebPlayer }] = await Promise.all([
           fetch(`/api/session-replay/${recordingId}`).then((r) => {
             if (!r.ok) throw new Error(`Failed to load recording (${r.status})`)
@@ -168,7 +170,7 @@ export function SessionReplayPlayer({ recordingId }: SessionReplayPlayerProps) {
         })
 
         setStatus('ready')
-        return () => { try { player.destroy() } catch { /* ignore */ } }
+        return () => { try { (player as unknown as { $destroy(): void }).$destroy() } catch { /* ignore */ } }
       } catch (err) {
         if (!destroyed) {
           setErrorMsg(err instanceof Error ? err.message : 'Unknown error')

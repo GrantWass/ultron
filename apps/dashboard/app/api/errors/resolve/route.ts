@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { fingerprint } from '@/lib/fingerprint'
 
-export const dynamic = 'force-dynamic'
 
 // GET /api/errors/resolve?project_id=&message=&event_type=
 // Returns count + first 3 matching errors (preview before resolving)

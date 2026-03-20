@@ -4,7 +4,6 @@ import { createServerClient } from '@/lib/supabase/server'
 import { createServiceRoleClient } from '@/lib/supabase/server'
 import { downloadRecording } from '@/lib/s3'
 
-export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 export async function GET(
@@ -38,5 +37,7 @@ export async function GET(
   const json = gunzipSync(compressed).toString('utf-8')
   const events = JSON.parse(json)
 
-  return NextResponse.json({ events })
+  return NextResponse.json({ events }, {
+    headers: { 'Cache-Control': 'private, max-age=300' },
+  })
 }

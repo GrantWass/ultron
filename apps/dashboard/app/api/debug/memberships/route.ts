@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServerClient, createServiceRoleClient } from '@/lib/supabase/server'
 
-export const dynamic = 'force-dynamic'
 
 // GET /api/debug/memberships — returns the current user's project access state
 export async function GET() {

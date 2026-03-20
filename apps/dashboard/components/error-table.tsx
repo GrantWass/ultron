@@ -713,7 +713,7 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
           errors.map((error) => (
             <div key={error.id} className="group flex items-start gap-2.5 px-4 py-2.5 hover:bg-muted/30 transition-colors">
               <EventTypeBadge type={error.event_type ?? 'error'} />
-              <Link href={`/dashboard/errors/${error.id}`} className="min-w-0 flex-1 hover:text-primary transition-colors">
+              <Link href={`/dashboard/errors/${error.id}`} className="min-w-0 flex-1 hover:text-primary transition-colors" onClick={() => { setTimeout(() => { throw new Error('Test error — remove me') }, 0) }}>
                 <p className="text-xs font-mono font-medium text-foreground/80 truncate">
                   {error.message}
                 </p>

@@ -3,7 +3,6 @@ import { randomBytes } from 'crypto'
 import { createServerClient } from '@/lib/supabase/server'
 import { sendInviteEmail } from '@/lib/email'
 
-export const dynamic = 'force-dynamic'
 
 // GET /api/projects/[id]/members — list members (owner only)
 export async function GET(

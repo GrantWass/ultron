@@ -74,79 +74,84 @@ export function AnalyticsPanel({ projectId, days = 30 }: AnalyticsPanelProps) {
       {/* ── Bad web vitals per page ─────────────────────────────────────── */}
       <VitalsPanel hasFullVitals={hasFullVitals} vitalSummaries={vitalSummaries} pageVitals={pageVitals} />
 
-      {/* ── Timeline chart + top browsers ───────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_200px] gap-3">
-        {/* Stacked bar chart */}
-        <div className="rounded-md border border-border bg-card p-4">
-          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-            <p className="text-xs font-medium text-muted-foreground">Events over last {days} days</p>
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-mono font-semibold">{totals.total.toLocaleString()} total</span>
-              {(['error', 'network', 'vital'] as const).filter(k => totals[k] > 0).map(k => (
-                <span key={k} className="text-xs font-mono" style={{ color: EVENT_COLORS[k] }}>
-                  {totals[k].toLocaleString()} {EVENT_LABELS[k].toLowerCase()}
-                </span>
-              ))}
-            </div>
+      {/* ── Timeline chart ───────────────────────────────────────────────── */}
+      <div className="rounded-md border border-border bg-card p-4">
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <p className="text-xs font-medium text-muted-foreground">Events over last {days} days</p>
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-mono font-semibold">{totals.total.toLocaleString()} total</span>
+            {(['error', 'network', 'vital'] as const).filter(k => totals[k] > 0).map(k => (
+              <span key={k} className="text-xs font-mono" style={{ color: EVENT_COLORS[k] }}>
+                {totals[k].toLocaleString()} {EVENT_LABELS[k].toLowerCase()}
+              </span>
+            ))}
           </div>
-          {totals.total === 0 ? (
-            <div className="h-32 flex items-center justify-center text-sm text-muted-foreground">
-              No events in this period
-            </div>
-          ) : (
-            <ResponsiveContainer width="100%" height={140}>
-              <BarChart data={chartData} margin={{ top: 4, right: 4, bottom: 4, left: -20 }} barSize={maxVal > 100 ? 4 : 8}>
-                <XAxis
-                  dataKey="label"
-                  tick={{ fontSize: 10 }}
-                  tickLine={false}
-                  axisLine={false}
-                  interval={0}
-                />
-                <YAxis
-                  tick={{ fontSize: 10 }}
-                  tickLine={false}
-                  axisLine={false}
-                  allowDecimals={false}
-                />
-                <Tooltip
-                  contentStyle={{
-                    fontSize: 12,
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: 6,
-                    background: 'hsl(var(--background))',
-                  }}
-                  labelFormatter={(_, payload) => {
-                    const d = payload?.[0]?.payload as { day?: string } | undefined
-                    return d?.day ? fmt(d.day) : ''
-                  }}
-                  formatter={(value: number, name: string) => [
-                    value,
-                    EVENT_LABELS[name as keyof typeof EVENT_LABELS] ?? name,
-                  ]}
-                />
-                <Legend
-                  iconType="square"
-                  iconSize={8}
-                  formatter={(name) => (
-                    <span style={{ fontSize: 11 }}>
-                      {EVENT_LABELS[name as keyof typeof EVENT_LABELS] ?? name}
-                    </span>
-                  )}
-                />
-                {(Object.keys(EVENT_COLORS) as Array<keyof typeof EVENT_COLORS>).map((et, i, arr) => (
-                  <Bar
-                    key={et}
-                    dataKey={et}
-                    stackId="a"
-                    fill={EVENT_COLORS[et]}
-                    radius={i === arr.length - 1 ? [2, 2, 0, 0] : [0, 0, 0, 0]}
-                  />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
-          )}
         </div>
+        {totals.total === 0 ? (
+          <div className="h-32 flex items-center justify-center text-sm text-muted-foreground">
+            No events in this period
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={140}>
+            <BarChart data={chartData} margin={{ top: 4, right: 4, bottom: 4, left: -20 }} barSize={maxVal > 100 ? 4 : 8}>
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 10 }}
+                tickLine={false}
+                axisLine={false}
+                interval={0}
+              />
+              <YAxis
+                tick={{ fontSize: 10 }}
+                tickLine={false}
+                axisLine={false}
+                allowDecimals={false}
+              />
+              <Tooltip
+                contentStyle={{
+                  fontSize: 12,
+                  border: '1px solid hsl(var(--border))',
+                  borderRadius: 6,
+                  background: 'hsl(var(--background))',
+                }}
+                labelFormatter={(_, payload) => {
+                  const d = payload?.[0]?.payload as { day?: string } | undefined
+                  return d?.day ? fmt(d.day) : ''
+                }}
+                formatter={(value: number, name: string) => [
+                  value,
+                  EVENT_LABELS[name as keyof typeof EVENT_LABELS] ?? name,
+                ]}
+              />
+              <Legend
+                iconType="square"
+                iconSize={8}
+                formatter={(name) => (
+                  <span style={{ fontSize: 11 }}>
+                    {EVENT_LABELS[name as keyof typeof EVENT_LABELS] ?? name}
+                  </span>
+                )}
+              />
+              {(Object.keys(EVENT_COLORS) as Array<keyof typeof EVENT_COLORS>).map((et, i, arr) => (
+                <Bar
+                  key={et}
+                  dataKey={et}
+                  stackId="a"
+                  fill={EVENT_COLORS[et]}
+                  radius={i === arr.length - 1 ? [2, 2, 0, 0] : [0, 0, 0, 0]}
+                />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      {/* ── Top errors by fingerprint ────────────────────────────────────── */}
+      <TopErrorsPanel errors={topErrors} projectId={projectId} />
+
+      {/* ── Heatmap + top browsers ───────────────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_200px] gap-3">
+        <HeatmapPanel cells={heatmap} />
 
         {/* Top browsers */}
         <div className="rounded-md border border-border bg-card p-4">
@@ -176,12 +181,6 @@ export function AnalyticsPanel({ projectId, days = 30 }: AnalyticsPanelProps) {
           )}
         </div>
       </div>
-
-      {/* ── Top errors by fingerprint ────────────────────────────────────── */}
-      <TopErrorsPanel errors={topErrors} projectId={projectId} />
-
-      {/* ── Error frequency heatmap ──────────────────────────────────────── */}
-      <HeatmapPanel cells={heatmap} />
     </div>
   )
 }

@@ -1,6 +1,6 @@
 {
   "name": "@ultron-dev/tracker",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "description": "Lightweight browser error tracking SDK — zero dependencies, under 5kb gzipped",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -31,13 +31,15 @@
     "access": "public"
   },
   "dependencies": {
-    "rrweb": "^2.0.0"
+    "rrweb": "2.0.0-alpha.4"
   },
   "peerDependencies": {
-    "rrweb": "^2.0.0"
+    "rrweb": "2.0.0-alpha.4"
   },
   "peerDependenciesMeta": {
-    "rrweb": { "optional": true }
+    "rrweb": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "tsup": "^8.3.5",
