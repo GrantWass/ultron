@@ -41,7 +41,7 @@ export function SessionReplayPlayer({ recordingId }: SessionReplayPlayerProps) {
         })
 
         setStatus('ready')
-        return () => { try { player.destroy() } catch { /* ignore */ } }
+        return () => { try { (player as unknown as { $destroy(): void }).$destroy() } catch { /* ignore */ } }
       } catch (err) {
         if (!destroyed) {
           setErrorMsg(err instanceof Error ? err.message : 'Unknown error')
