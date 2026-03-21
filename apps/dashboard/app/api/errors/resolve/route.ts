@@ -27,13 +27,12 @@ export async function GET(request: Request) {
 
   const fp = fingerprint(message)
 
-  // Match by fingerprint (new errors) OR exact message (backfilled / old rows)
   const { data: examples, count } = await supabase
     .from('errors')
     .select('id, url, browser, os, created_at', { count: 'exact' })
     .eq('project_id', project_id)
     .eq('event_type', event_type)
-    .or(`message_fingerprint.eq.${fp},and(message_fingerprint.is.null,message.eq.${message})`)
+    .eq('message_fingerprint', fp)
     .order('created_at', { ascending: false })
     .limit(3)
 
@@ -71,7 +70,7 @@ export async function DELETE(request: Request) {
     .delete({ count: 'exact' })
     .eq('project_id', project_id)
     .eq('event_type', event_type)
-    .or(`message_fingerprint.eq.${fp},and(message_fingerprint.is.null,message.eq.${message})`)
+    .eq('message_fingerprint', fp)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
