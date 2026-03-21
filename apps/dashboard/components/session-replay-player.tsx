@@ -47,9 +47,10 @@ function extractSideEvents(events: any[]): { network: NetworkReplayEvent[]; cons
 
 function formatTs(baseTs: number, ts: number): string {
   const diff = ts - baseTs
-  const s = Math.floor(diff / 1000)
-  const ms = diff % 1000
-  return `${s}.${String(ms).padStart(3, '0')}s`
+  const abs = Math.abs(diff)
+  const s = Math.floor(abs / 1000)
+  const ms = abs % 1000
+  return `${diff < 0 ? '-' : ''}${s}.${String(ms).padStart(3, '0')}s`
 }
 
 function statusColor(ok: boolean, slow?: boolean): string {
