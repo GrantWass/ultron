@@ -192,7 +192,7 @@ export function SessionReplayPlayer({ recordingId }: SessionReplayPlayerProps) {
   ]
 
   return (
-    <div className="rounded-md border border-border overflow-hidden">
+    <div className="rounded-md border border-border">
       <div className="px-4 py-2 border-b border-border bg-muted/50">
         <h2 className="text-sm font-medium">Session Replay</h2>
       </div>
@@ -205,10 +205,9 @@ export function SessionReplayPlayer({ recordingId }: SessionReplayPlayerProps) {
       )}
 
       {/* rrweb-player mounts its own UI into this div */}
-      <div
-        ref={containerRef}
-        className={status !== 'ready' ? 'hidden' : undefined}
-      />
+      <div className={status !== 'ready' ? 'hidden' : 'overflow-hidden'}>
+        <div ref={containerRef} />
+      </div>
 
       {/* Console + Network panels */}
       {status === 'ready' && (
