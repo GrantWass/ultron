@@ -27,16 +27,32 @@ export async function GET(request: Request) {
 
   const fp = fingerprint(message)
 
-  const { data: examples, count } = await supabase
-    .from('errors')
-    .select('id, url, browser, os, created_at', { count: 'exact' })
-    .eq('project_id', project_id)
-    .eq('event_type', event_type)
-    .eq('message_fingerprint', fp)
-    .order('created_at', { ascending: false })
-    .limit(3)
+  // Two safe queries — avoids raw .or() strings that break on special chars
+  const [{ data: byFp, count: countFp }, { data: byMsg, count: countMsg }] = await Promise.all([
+    supabase
+      .from('errors')
+      .select('id, url, browser, os, created_at', { count: 'exact' })
+      .eq('project_id', project_id)
+      .eq('event_type', event_type)
+      .eq('message_fingerprint', fp)
+      .order('created_at', { ascending: false })
+      .limit(3),
+    supabase
+      .from('errors')
+      .select('id, url, browser, os, created_at', { count: 'exact' })
+      .eq('project_id', project_id)
+      .eq('event_type', event_type)
+      .is('message_fingerprint', null)
+      .eq('message', message)
+      .order('created_at', { ascending: false })
+      .limit(3),
+  ])
 
-  return NextResponse.json({ count: count ?? 0, examples: examples ?? [] })
+  const count = (countFp ?? 0) + (countMsg ?? 0)
+  // Merge examples, cap at 3
+  const examples = [...(byFp ?? []), ...(byMsg ?? [])].slice(0, 3)
+
+  return NextResponse.json({ count, examples })
 }
 
 export async function DELETE(request: Request) {
@@ -65,14 +81,25 @@ export async function DELETE(request: Request) {
 
   const fp = fingerprint(message)
 
-  const { error, count } = await supabase
-    .from('errors')
-    .delete({ count: 'exact' })
-    .eq('project_id', project_id)
-    .eq('event_type', event_type)
-    .eq('message_fingerprint', fp)
+  // Two safe deletes — fingerprinted rows + legacy null-fingerprint rows
+  const [{ error: e1, count: c1 }, { error: e2, count: c2 }] = await Promise.all([
+    supabase
+      .from('errors')
+      .delete({ count: 'exact' })
+      .eq('project_id', project_id)
+      .eq('event_type', event_type)
+      .eq('message_fingerprint', fp),
+    supabase
+      .from('errors')
+      .delete({ count: 'exact' })
+      .eq('project_id', project_id)
+      .eq('event_type', event_type)
+      .is('message_fingerprint', null)
+      .eq('message', message),
+  ])
 
+  const error = e1 ?? e2
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json({ deleted: count ?? 0 })
+  return NextResponse.json({ deleted: (c1 ?? 0) + (c2 ?? 0) })
 }

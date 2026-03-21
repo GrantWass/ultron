@@ -118,7 +118,7 @@ export function ResolveButton({ projectId, message, eventType }: ResolveButtonPr
               )}
 
               <p className="text-xs text-muted-foreground">
-                Only <span className="font-medium text-foreground">{eventType}</span> errors with this exact message are affected.
+                All <span className="font-medium text-foreground">{eventType}</span> errors matching this fingerprint will be deleted.
               </p>
             </div>
 
