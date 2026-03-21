@@ -39,7 +39,7 @@ export function captureError(error: Error, metadata?: Record<string, unknown>): 
   if (!instance) {
     console.warn('[Ultron] captureError called before initTracker')
     return
-  }
+  } 
   instance.captureError(error, metadata)
 }
 
