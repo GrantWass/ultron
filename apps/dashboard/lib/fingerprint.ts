@@ -20,8 +20,8 @@ export function fingerprint(message: string): string {
     .replace(/\/[0-9a-f]{8,}\b/gi, '/{hash}')
     // IPv4 addresses
     .replace(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g, '{ip}')
-    // All remaining standalone numbers (IDs, durations, ports, status codes, etc.)
-    .replace(/\b\d+\b/g, '{n}')
+    // All remaining numbers (IDs, durations like 423ms, ports, status codes, etc.)
+    .replace(/\b\d+/g, '{n}')
     // Collapse any double spaces left behind
     .replace(/\s{2,}/g, ' ')
     .trim()
