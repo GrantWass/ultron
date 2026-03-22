@@ -1,6 +1,7 @@
 import { streamText } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createServerClient, createServiceRoleClient } from '@/lib/supabase/server'
+import { LIMITS, isWeekExpired, type Plan } from '@/lib/plans'
 
 export const runtime = 'nodejs'
 
@@ -103,6 +104,25 @@ export async function POST(request: Request) {
     })
   }
 
+  // Check + enforce weekly AI limit
+  await service.from('profiles').upsert({ id: user.id }, { onConflict: 'id', ignoreDuplicates: true })
+  const { data: profile } = await service.from('profiles').select('plan, weekly_ai_count, ai_count_reset_at').eq('id', user.id).single()
+  if (profile) {
+    const plan = (profile.plan ?? 'free') as Plan
+    let aiCount = profile.weekly_ai_count ?? 0
+    if (isWeekExpired(profile.ai_count_reset_at)) {
+      await service.from('profiles').update({ weekly_ai_count: 0, ai_count_reset_at: new Date().toISOString() }).eq('id', user.id)
+      aiCount = 0
+    }
+    const limit = LIMITS[plan].ai_per_week
+    if (aiCount >= limit) {
+      return new Response(JSON.stringify({ error: 'Weekly AI suggestion limit reached.', code: 'ai_limit' }), {
+        status: 429,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+  }
+
   const { data: events } = await service
     .from('errors')
     .select('event_type, message, url, browser, os, connection, created_at')
@@ -121,6 +141,11 @@ export async function POST(request: Request) {
     model: openai('gpt-4o-mini'),
     messages: [{ role: 'user', content: buildPrompt(events) }],
     maxTokens: 4000,
+    onFinish: async () => {
+      if (profile) {
+        await service.from('profiles').update({ weekly_ai_count: (profile.weekly_ai_count ?? 0) + 1 }).eq('id', user.id)
+      }
+    },
   })
 
   return result.toDataStreamResponse()

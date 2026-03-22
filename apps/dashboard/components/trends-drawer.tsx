@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useCompletion } from 'ai/react'
 import { X, Loader2, RefreshCw, TrendingUp } from 'lucide-react'
+import { UpgradeModal } from './upgrade-modal'
 
 interface TrendsDrawerProps {
   projectId: string
@@ -67,9 +68,15 @@ function TrendsMarkdown({ text }: { text: string }) {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function TrendsDrawer({ projectId, onClose, cachedAnalysis, onAnalysisComplete }: TrendsDrawerProps) {
+  const [aiLimitHit, setAiLimitHit] = useState(false)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+
   const { complete, completion, isLoading, error } = useCompletion({
     api: '/api/trends',
     onFinish: (_prompt, text) => onAnalysisComplete(text),
+    onResponse: (response) => {
+      if (response.status === 429) setAiLimitHit(true)
+    },
   })
 
   useEffect(() => {
@@ -95,6 +102,8 @@ export function TrendsDrawer({ projectId, onClose, cachedAnalysis, onAnalysisCom
 
   return (
     <>
+      {showUpgradeModal && <UpgradeModal reason="ai" onClose={() => setShowUpgradeModal(false)} />}
+
       {/* Backdrop */}
       <div
         className="fixed inset-0 z-40 bg-black/30"
@@ -138,7 +147,17 @@ export function TrendsDrawer({ projectId, onClose, cachedAnalysis, onAnalysisCom
             </div>
           )}
 
-          {error && !displayText && (
+          {aiLimitHit && (
+            <div className="rounded-md border border-border bg-muted/30 px-4 py-3 space-y-2">
+              <p className="text-sm font-medium">Weekly AI limit reached</p>
+              <p className="text-xs text-muted-foreground">You&apos;ve used all your AI suggestions for this week. Upgrade to Pro for 500 suggestions per week.</p>
+              <button onClick={() => setShowUpgradeModal(true)} className="text-xs text-primary hover:underline">
+                Upgrade to Pro →
+              </button>
+            </div>
+          )}
+
+          {error && !displayText && !aiLimitHit && (
             <div className="space-y-3">
               <p className="text-sm text-destructive">
                 {error.message === 'No events to analyze yet'
