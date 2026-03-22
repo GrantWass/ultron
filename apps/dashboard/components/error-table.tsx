@@ -392,6 +392,7 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
   const [savingFilter, setSavingFilter]   = useState(false)
   const [filters, setFilters]             = useState<IngestFilter[]>([])
   const [trendsOpen, setTrendsOpen]       = useState(false)
+  const [trendsCache, setTrendsCache]     = useState<string | null>(null)
 
   // Filter state
   const [search, setSearch]         = useState('')
@@ -798,6 +799,8 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
         <TrendsDrawer
           projectId={activeProjectId}
           onClose={() => setTrendsOpen(false)}
+          cachedAnalysis={trendsCache}
+          onAnalysisComplete={(text) => setTrendsCache(text)}
         />
       )}
 

@@ -46,24 +46,24 @@ ${JSON.stringify(formatted, null, 2)}
 \`\`\`
 
 ## Task
-Analyze this event feed and provide a concise diagnostic report with exactly these sections:
+Analyze this event feed and report only on what is actually meaningful. Use any of these sections that have something worth saying — skip any that don't apply to this data:
 
 ### Most Frequent Errors
-List the top recurring error messages or event types by count. Note how many times each appears and whether occurrences are recent or spread out.
+Top recurring error messages or event types by count, and whether they are recent or spread out.
 
 ### Problematic Pages / URLs
-Which URL paths appear most often across all events? Are any pages associated exclusively with a particular error type?
+URL paths that appear disproportionately often, especially if tied to a specific error type.
 
 ### Error Clusters
-Identify meaningful groupings — errors that likely share a root cause, browser/OS-specific patterns, or connection-type issues.
+Meaningful groupings — shared root cause, browser/OS-specific patterns, or connection-type issues. Only include if genuine patterns exist.
 
 ### Spike Detection
-Looking at the timestamps, are there any bursts of errors within a short window (5+ events within 10 minutes)? If so, note when and which type dominated.
+Bursts of errors within a short window (5+ events within 10 minutes). Only include if a spike is actually present.
 
 ### Recommendations
-Up to 3 short, actionable items the team should investigate first.
+Up to 3 actionable items to investigate. Only include if there is something concrete to act on.
 
-Be direct and concise. 2–5 bullet points per section. No preamble. No closing remarks.`
+Be direct and concise. 2–5 bullet points per section. Omit any section entirely if it would just be noise. No preamble. No closing remarks.`
 }
 
 export async function POST(request: Request) {

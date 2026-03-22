@@ -7,6 +7,8 @@ import { X, Loader2, RefreshCw, TrendingUp } from 'lucide-react'
 interface TrendsDrawerProps {
   projectId: string
   onClose: () => void
+  cachedAnalysis?: string | null
+  onAnalysisComplete: (text: string) => void
 }
 
 // ── Minimal markdown renderer for structured trend output ─────────────────────
@@ -64,13 +66,16 @@ function TrendsMarkdown({ text }: { text: string }) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function TrendsDrawer({ projectId, onClose }: TrendsDrawerProps) {
+export function TrendsDrawer({ projectId, onClose, cachedAnalysis, onAnalysisComplete }: TrendsDrawerProps) {
   const { complete, completion, isLoading, error } = useCompletion({
     api: '/api/trends',
+    onFinish: (_prompt, text) => onAnalysisComplete(text),
   })
 
   useEffect(() => {
-    complete('', { body: { project_id: projectId } })
+    if (!cachedAnalysis) {
+      complete('', { body: { project_id: projectId } })
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -85,6 +90,8 @@ export function TrendsDrawer({ projectId, onClose }: TrendsDrawerProps) {
   function handleReanalyze() {
     complete('', { body: { project_id: projectId } })
   }
+
+  const displayText = completion || cachedAnalysis
 
   return (
     <>
@@ -104,7 +111,7 @@ export function TrendsDrawer({ projectId, onClose }: TrendsDrawerProps) {
             <span className="text-xs text-muted-foreground">last 50 events</span>
           </div>
           <div className="flex items-center gap-2">
-            {completion && !isLoading && (
+            {displayText && !isLoading && (
               <button
                 onClick={handleReanalyze}
                 className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -124,14 +131,14 @@ export function TrendsDrawer({ projectId, onClose }: TrendsDrawerProps) {
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-4">
-          {isLoading && !completion && (
+          {isLoading && !displayText && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
               <Loader2 className="h-4 w-4 animate-spin" />
               Analyzing recent events…
             </div>
           )}
 
-          {error && !completion && (
+          {error && !displayText && (
             <div className="space-y-3">
               <p className="text-sm text-destructive">
                 {error.message === 'No events to analyze yet'
@@ -150,7 +157,7 @@ export function TrendsDrawer({ projectId, onClose }: TrendsDrawerProps) {
             </div>
           )}
 
-          {completion && (
+          {displayText && (
             <div className="space-y-1">
               {isLoading && (
                 <div className="flex items-center gap-1.5 mb-3 text-xs text-muted-foreground">
@@ -158,7 +165,7 @@ export function TrendsDrawer({ projectId, onClose }: TrendsDrawerProps) {
                   Generating…
                 </div>
               )}
-              <TrendsMarkdown text={completion} />
+              <TrendsMarkdown text={displayText} />
             </div>
           )}
         </div>
