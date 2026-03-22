@@ -202,7 +202,10 @@ export function SessionReplayPlayer({ recordingId }: SessionReplayPlayerProps) {
         <div className="p-6 text-sm text-muted-foreground text-center">Loading recording…</div>
       )}
       {status === 'error' && (
-        <div className="p-6 text-sm text-destructive text-center">{errorMsg}</div>
+        <div className="p-6 text-center space-y-1">
+          <p className="text-sm text-destructive">{errorMsg}</p>
+          <p className="text-xs text-muted-foreground">If this error just occurred, the recording may still be uploading — try refreshing in a moment.</p>
+        </div>
       )}
 
       {/* rrweb-player mounts its own UI into this div */}

@@ -489,11 +489,21 @@ export default async function ErrorDetailPage({
         </details>
       )}
 
-      {/* Session replay — shown when a recording was captured for this event */}
-      {(rawError as { session_recording_id?: string | null }).session_recording_id && (
+      {/* Session replay */}
+      {(rawError as { session_recording_id?: string | null }).session_recording_id ? (
         <SessionReplayPlayer
           recordingId={(rawError as { session_recording_id: string }).session_recording_id}
         />
+      ) : (
+        <div className="rounded-md border border-border">
+          <div className="px-4 py-2 border-b border-border bg-muted/50">
+            <h2 className="text-sm font-medium">Session Replay</h2>
+          </div>
+          <div className="p-6 text-center space-y-1">
+            <p className="text-sm text-muted-foreground">No recording for this event.</p>
+            <p className="text-xs text-muted-foreground">Enable session replay by passing <code className="font-mono bg-muted px-1 py-0.5 rounded">sessionReplay: true</code> to <code className="font-mono bg-muted px-1 py-0.5 rounded">initTracker</code>.</p>
+          </div>
+        </div>
       )}
 
       {/* AI fix suggestion — only for JS errors */}
