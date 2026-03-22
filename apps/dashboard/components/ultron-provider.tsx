@@ -7,7 +7,7 @@ export function UltronProvider() {
     const apiKey = process.env.NEXT_PUBLIC_ULTRON_API_KEY || ''
     import('@ultron-dev/tracker')
       .then(({ initTracker }) => {
-        initTracker({ apiKey, debug: true, sessionReplay: true })
+        initTracker({ apiKey, sessionReplay: true })
       })
       .catch((err) => {
         console.warn('[Ultron] Failed to load tracker:', err)

@@ -186,10 +186,16 @@ export async function POST(request: Request) {
     await supabase.rpc('increment_event_count', { user_id: ownerId, amount: records.length })
       .then(({ error }) => {
         if (error) {
-          // Fallback: plain update (slightly racy but acceptable)
+          // Fallback: fetch current count then increment (slightly racy but acceptable)
           supabase.from('profiles')
-            .update({ monthly_event_count: (records.length) })
+            .select('monthly_event_count')
             .eq('id', ownerId)
+            .single()
+            .then(({ data }) => {
+              supabase.from('profiles')
+                .update({ monthly_event_count: (data?.monthly_event_count ?? 0) + records.length })
+                .eq('id', ownerId)
+            })
         }
       })
   }

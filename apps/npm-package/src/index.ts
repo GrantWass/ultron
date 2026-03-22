@@ -1,7 +1,7 @@
 import { UltronTracker } from './tracker'
 import type { TrackerConfig } from './types'
 
-export type { TrackerConfig } from './types'
+export type { TrackerConfig, SessionReplayConfig } from './types'
 export type { ErrorPayload, IngestBody } from './types'
 
 let instance: UltronTracker | null = null
@@ -11,7 +11,7 @@ let instance: UltronTracker | null = null
  *
  * @example
  * ```ts
- * import { initTracker } from '@ultron/tracker'
+ * import { initTracker } from '@ultron-dev/tracker'
  *
  * initTracker({
  *   apiKey: 'your-project-api-key',
