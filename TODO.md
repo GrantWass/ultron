@@ -78,6 +78,17 @@ Users need to know about new errors immediately, not just when they log in. "Fir
 
 ---
 
+## Session replay limits by plan
+Limit session replay volume for free users to create an upgrade trigger while still letting them experience the feature.
+
+**Implementation notes:**
+- Free plan: retain only the 50 most recent session replays per project
+- Pro plan: unlimited replays (still expire from S3 after 7 days)
+- Enforce at ingest time: after storing a new replay, delete the oldest ones beyond the 50-replay cap for free users
+- Show a "Upgrade to Pro for unlimited replays" prompt when the free user hits the cap
+
+---
+
 ## Error volume limits + overage billing
 Gate the ingest endpoint on a monthly error count. Users hit the limit exactly when they need the product most — the highest-conversion moment possible.
 

@@ -3,6 +3,7 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { createServerClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { parseStackTrace, extractSearchKeywords } from '@/lib/stack-parser'
 import { fetchGitHubFiles, searchAndFetchGitHubFiles } from '@/lib/github'
+import { LIMITS, isWeekExpired, type Plan } from '@/lib/plans'
 import type { ErrorRecord, ErrorWithProjectAndGitHub, RelevantFile } from '@ultron/types'
 
 export const runtime = 'nodejs'
@@ -114,6 +115,31 @@ export async function POST(request: Request) {
     }
   }
 
+  // ── Weekly AI limit check (skip if cached suggestion exists) ─────────────
+  await service.from('profiles').upsert({ id: user.id }, { onConflict: 'id', ignoreDuplicates: true })
+  const { data: profile } = await service
+    .from('profiles')
+    .select('plan, weekly_ai_count, ai_count_reset_at')
+    .eq('id', user.id)
+    .single()
+
+  if (profile) {
+    const plan = (profile.plan ?? 'free') as Plan
+    let aiCount = profile.weekly_ai_count ?? 0
+    if (isWeekExpired(profile.ai_count_reset_at)) {
+      await service.from('profiles').update({ weekly_ai_count: 0, ai_count_reset_at: new Date().toISOString() }).eq('id', user.id)
+      aiCount = 0
+    }
+    const limit = LIMITS[plan].ai_per_week
+    if (aiCount >= limit) {
+      return new Response(
+        JSON.stringify({ error: 'Weekly AI suggestion limit reached. Upgrade to Pro for unlimited suggestions.', code: 'ai_limit' }),
+        { status: 429, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+  }
+  // ──────────────────────────────────────────────────────────────────────────
+
   // Check for existing suggestion
   const { data: existing } = await service
     .from('fix_suggestions')
@@ -189,11 +215,10 @@ export async function POST(request: Request) {
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 16000,
     onFinish: async ({ text }) => {
-      await service.from('fix_suggestions').insert({
-        error_id: errorId,
-        suggestion: text,
-        relevant_files: files,
-      })
+      await Promise.all([
+        service.from('fix_suggestions').insert({ error_id: errorId, suggestion: text, relevant_files: files }),
+        service.from('profiles').update({ weekly_ai_count: (profile?.weekly_ai_count ?? 0) + 1 }).eq('id', user.id),
+      ])
     },
   })
 

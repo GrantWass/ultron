@@ -1,12 +1,20 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createServerClient, createServiceRoleClient } from '@/lib/supabase/server'
+import { SidebarWrapper } from '@/components/sidebar-wrapper'
+import { LIMITS, isBillingCycleExpired, isWeekExpired, type Plan } from '@/lib/plans'
+import type { ProjectWithOwnerFlag } from '@ultron/types'
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
 }
-import { SidebarWrapper } from '@/components/sidebar-wrapper'
-import type { ProjectWithOwnerFlag } from '@ultron/types'
+
+export type UsageData = {
+  plan: Plan
+  events:   { used: number; limit: number }
+  ai:       { used: number; limit: number }
+  projects: { used: number; limit: number }
+}
 
 export default async function DashboardLayout({
   children,
@@ -19,10 +27,14 @@ export default async function DashboardLayout({
 
   const serviceClient = createServiceRoleClient()
 
+  // Ensure profile row exists for usage queries
+  await serviceClient.from('profiles').upsert({ id: user.id }, { onConflict: 'id', ignoreDuplicates: true })
+
   const [
     { data: ownedProjects },
     { data: memberRows },
     { data: pendingInviteRows },
+    { data: profile },
   ] = await Promise.all([
     supabase
       .from('projects')
@@ -40,6 +52,11 @@ export default async function DashboardLayout({
       .select('token, project_id')
       .eq('invited_email', user.email!)
       .eq('status', 'pending'),
+    serviceClient
+      .from('profiles')
+      .select('plan, monthly_event_count, billing_cycle_start, weekly_ai_count, ai_count_reset_at')
+      .eq('id', user.id)
+      .single(),
   ])
 
   // Fetch shared project details via service role so RLS doesn't block non-owner reads
@@ -70,9 +87,32 @@ export default async function DashboardLayout({
     projectName: projectNameMap[r.project_id as string] ?? 'Unknown project',
   }))
 
+  // Build usage snapshot for the sidebar
+  const plan = ((profile?.plan ?? 'free') as Plan)
+  const limits = LIMITS[plan]
+
+  let eventCount = profile?.monthly_event_count ?? 0
+  if (profile && isBillingCycleExpired(profile.billing_cycle_start)) {
+    await serviceClient.from('profiles').update({ monthly_event_count: 0, billing_cycle_start: new Date().toISOString().slice(0, 10) }).eq('id', user.id)
+    eventCount = 0
+  }
+
+  let aiCount = profile?.weekly_ai_count ?? 0
+  if (profile && isWeekExpired(profile.ai_count_reset_at)) {
+    await serviceClient.from('profiles').update({ weekly_ai_count: 0, ai_count_reset_at: new Date().toISOString() }).eq('id', user.id)
+    aiCount = 0
+  }
+
+  const usage: UsageData = {
+    plan,
+    events:   { used: eventCount,              limit: limits.events_per_month },
+    ai:       { used: aiCount,                 limit: limits.ai_per_week },
+    projects: { used: ownedProjects?.length ?? 0, limit: limits.projects },
+  }
+
   return (
     <div className="flex h-screen overflow-hidden">
-      <SidebarWrapper projects={allProjects as ProjectWithOwnerFlag[]} pendingInvites={invites} />
+      <SidebarWrapper projects={allProjects as ProjectWithOwnerFlag[]} pendingInvites={invites} usage={usage} />
       <main className="flex-1 overflow-y-auto bg-background pt-14 md:pt-0">
         {children}
       </main>

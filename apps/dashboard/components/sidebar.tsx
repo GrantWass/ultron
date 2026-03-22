@@ -4,8 +4,10 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import type { ProjectWithOwnerFlag } from '@ultron/types'
+import type { UsageData } from '@/app/dashboard/layout'
 import { AlertCircle, FolderOpen, Settings, Zap, Users, Mail, SlidersHorizontal, BarChart2 } from 'lucide-react'
-import React from 'react'
+import React, { useState } from 'react'
+import { UpgradeModal } from './upgrade-modal'
 
 interface PendingInvite {
   token: string
@@ -17,12 +19,40 @@ interface SidebarProps {
   projects: ProjectWithOwnerFlag[]
   currentProjectId?: string
   pendingInvites?: PendingInvite[]
+  usage?: UsageData
   isOpen?: boolean
   onClose?: () => void
 }
 
-export function Sidebar({ projects, currentProjectId, pendingInvites, isOpen, onClose }: SidebarProps) {
+function UsageBar({ label, used, limit }: { label: string; used: number; limit: number }) {
+  const isUnlimited = !isFinite(limit)
+  const pct = isUnlimited ? 0 : Math.min((used / limit) * 100, 100)
+  const isWarning = pct >= 80
+  const isOver    = pct >= 100
+
+  return (
+    <div className="space-y-1">
+      <div className="flex justify-between text-[10px] text-muted-foreground">
+        <span>{label}</span>
+        <span className={isOver ? 'text-destructive font-medium' : isWarning ? 'text-yellow-600 dark:text-yellow-400 font-medium' : ''}>
+          {isUnlimited ? '∞' : `${used.toLocaleString()} / ${limit.toLocaleString()}`}
+        </span>
+      </div>
+      {!isUnlimited && (
+        <div className="h-1 rounded-full bg-muted overflow-hidden">
+          <div
+            className={cn('h-full rounded-full transition-all', isOver ? 'bg-destructive' : isWarning ? 'bg-yellow-500' : 'bg-primary/60')}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function Sidebar({ projects, currentProjectId, pendingInvites, usage, isOpen, onClose }: SidebarProps) {
   const pathname = usePathname()
+  const [upgradeOpen, setUpgradeOpen] = useState(false)
 
   // Derive current project id from URL if not passed explicitly
   const projectIdMatch = pathname.match(/\/dashboard\/projects\/([^/]+)/)
@@ -153,6 +183,35 @@ export function Sidebar({ projects, currentProjectId, pendingInvites, isOpen, on
           </Link>
         </div>
       </nav>
+
+      {/* Usage panel */}
+      {usage && (
+        <div className="border-t border-border px-3 py-3 space-y-2.5">
+          {usage.plan === 'free' ? (
+            <>
+              <UsageBar label="Events this month" used={usage.events.used}   limit={usage.events.limit} />
+              <UsageBar label="AI fixes this week" used={usage.ai.used}      limit={usage.ai.limit} />
+              <UsageBar label="Projects"           used={usage.projects.used} limit={usage.projects.limit} />
+              <button
+                onClick={() => setUpgradeOpen(true)}
+                className="w-full inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                <Zap className="h-3 w-3" />
+                Upgrade to Pro
+              </button>
+            </>
+          ) : (
+            <div className="flex items-center gap-1.5 text-xs text-primary font-medium">
+              <Zap className="h-3 w-3" />
+              Pro plan
+            </div>
+          )}
+        </div>
+      )}
+
+      {upgradeOpen && (
+        <UpgradeModal reason="events" onClose={() => setUpgradeOpen(false)} />
+      )}
     </aside>
   )
 }

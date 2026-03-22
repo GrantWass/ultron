@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Menu, Zap } from 'lucide-react'
 import { Sidebar } from './sidebar'
 import type { ProjectWithOwnerFlag } from '@ultron/types'
+import type { UsageData } from '@/app/dashboard/layout'
 
 interface PendingInvite {
   token: string
@@ -14,9 +15,10 @@ interface PendingInvite {
 interface SidebarWrapperProps {
   projects: ProjectWithOwnerFlag[]
   pendingInvites?: PendingInvite[]
+  usage?: UsageData
 }
 
-export function SidebarWrapper({ projects, pendingInvites }: SidebarWrapperProps) {
+export function SidebarWrapper({ projects, pendingInvites, usage }: SidebarWrapperProps) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -46,6 +48,7 @@ export function SidebarWrapper({ projects, pendingInvites }: SidebarWrapperProps
       <Sidebar
         projects={projects}
         pendingInvites={pendingInvites}
+        usage={usage}
         isOpen={open}
         onClose={() => setOpen(false)}
       />

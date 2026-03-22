@@ -8,6 +8,7 @@ import {
   Github, Check, Code2, Users, Trash2, Mail,
   Search, Lock, RefreshCw, Settings, ExternalLink,
 } from 'lucide-react'
+import { UpgradeModal } from '@/components/upgrade-modal'
 
 // ── GitHub repo section ────────────────────────────────────────────────────────
 
@@ -265,6 +266,7 @@ function TeamSection({ projectId }: { projectId: string }) {
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviting, setInviting] = useState(false)
   const [inviteMsg, setInviteMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [showCollabUpgrade, setShowCollabUpgrade] = useState(false)
 
   useEffect(() => {
     fetch(`/api/projects/${projectId}/members`)
@@ -287,6 +289,8 @@ function TeamSection({ projectId }: { projectId: string }) {
       setMembers((prev) => [data, ...prev])
       setInviteEmail('')
       setInviteMsg({ type: 'ok', text: `Invite sent to ${data.invited_email}` })
+    } else if (res.status === 403 && data.code === 'collaborator_limit') {
+      setShowCollabUpgrade(true)
     } else {
       setInviteMsg({ type: 'err', text: data.error ?? 'Failed to send invite' })
     }
@@ -300,6 +304,7 @@ function TeamSection({ projectId }: { projectId: string }) {
 
   return (
     <div className="space-y-3">
+      {showCollabUpgrade && <UpgradeModal reason="collaborators" onClose={() => setShowCollabUpgrade(false)} />}
       <h2 className="text-sm font-semibold flex items-center gap-2">
         <Users className="h-4 w-4" />
         Team

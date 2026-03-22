@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useCompletion } from 'ai/react'
 import { Wand2, Loader2, Github, Info, RefreshCw } from 'lucide-react'
+import { UpgradeModal } from './upgrade-modal'
 
 interface FixSuggestionProps {
   errorId: string
@@ -225,9 +226,14 @@ function MarkdownRenderer({ text }: { text: string }) {
 
 export function FixSuggestion({ errorId, projectId, existingSuggestion, githubRepo }: FixSuggestionProps) {
   const [showFix, setShowFix] = useState(!!existingSuggestion)
+  const [aiLimitHit, setAiLimitHit] = useState(false)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
   const { complete, completion, isLoading, error } = useCompletion({
     api: '/api/fix',
+    onResponse: (response) => {
+      if (response.status === 429) setAiLimitHit(true)
+    },
   })
 
   async function handleSuggestFix() {
@@ -295,9 +301,24 @@ export function FixSuggestion({ errorId, projectId, existingSuggestion, githubRe
       )}
 
       {/* Error */}
-      {error && (
+      {error && !aiLimitHit && (
         <p className="text-sm text-destructive">Failed to generate suggestion. Please try again.</p>
       )}
+
+      {aiLimitHit && (
+        <div className="rounded-md border border-border bg-muted/30 px-4 py-3 space-y-2">
+          <p className="text-sm font-medium">Weekly AI limit reached</p>
+          <p className="text-xs text-muted-foreground">You&apos;ve used all 5 AI fix suggestions for this week. Upgrade to Pro for 500 suggestions per week.</p>
+          <button
+            onClick={() => setShowUpgradeModal(true)}
+            className="text-xs text-primary hover:underline"
+          >
+            Upgrade to Pro →
+          </button>
+        </div>
+      )}
+
+      {showUpgradeModal && <UpgradeModal reason="ai" onClose={() => setShowUpgradeModal(false)} />}
 
       {/* Trigger button */}
       {!showFix && !isLoading && (

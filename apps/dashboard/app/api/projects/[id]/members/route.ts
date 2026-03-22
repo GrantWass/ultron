@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { randomBytes } from 'crypto'
-import { createServerClient } from '@/lib/supabase/server'
+import { createServerClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { sendInviteEmail } from '@/lib/email'
+import { LIMITS, type Plan } from '@/lib/plans'
 
 
 // GET /api/projects/[id]/members — list members (owner only)
@@ -48,6 +49,20 @@ export async function POST(
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: 'Valid email required' }, { status: 400 })
   }
+
+  // ── Collaborator limit ────────────────────────────────────────────────────
+  const service = createServiceRoleClient()
+  await service.from('profiles').upsert({ id: user.id }, { onConflict: 'id', ignoreDuplicates: true })
+  const [{ data: profile }, { count: memberCount }] = await Promise.all([
+    service.from('profiles').select('plan').eq('id', user.id).single(),
+    supabase.from('project_members').select('id', { count: 'exact', head: true }).eq('project_id', id),
+  ])
+  const plan = ((profile?.plan ?? 'free') as Plan)
+  const collabLimit = LIMITS[plan].collaborators_per_project
+  if ((memberCount ?? 0) >= collabLimit) {
+    return NextResponse.json({ error: 'Collaborator limit reached. Upgrade to Pro for unlimited team members.', code: 'collaborator_limit' }, { status: 403 })
+  }
+  // ──────────────────────────────────────────────────────────────────────────
 
   // Can't invite yourself
   if (email === user.email) {

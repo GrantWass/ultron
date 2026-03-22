@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { createServerClient } from '@supabase/ssr'
 import { ingestRatelimit } from '@/lib/redis'
 import { fingerprint } from '@/lib/fingerprint'
+import { LIMITS, isBillingCycleExpired, type Plan } from '@/lib/plans'
 import type { IngestPayload } from '@ultron/types'
 
 export const runtime = 'nodejs'
@@ -13,7 +14,6 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type, x-api-key',
 }
 
-// Handle preflight requests
 export async function OPTIONS() {
   return new Response(null, { status: 204, headers: CORS_HEADERS })
 }
@@ -79,7 +79,7 @@ export async function POST(request: Request) {
   const supabase = createServiceClient()
   const { data: project, error: projectError } = await supabase
     .from('projects')
-    .select('id')
+    .select('id, user_id')
     .eq('api_key', apiKey)
     .single()
 
@@ -95,6 +95,42 @@ export async function POST(request: Request) {
     )
   }
 
+  // ── Plan limit check ───────────────────────────────────────────────────────
+  const ownerId = project.user_id
+  if (ownerId) {
+    // Ensure profile exists
+    await supabase.from('profiles').upsert({ id: ownerId }, { onConflict: 'id', ignoreDuplicates: true })
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('plan, monthly_event_count, billing_cycle_start')
+      .eq('id', ownerId)
+      .single()
+
+    if (profile) {
+      const plan = (profile.plan ?? 'free') as Plan
+      let currentCount = profile.monthly_event_count ?? 0
+
+      // Reset counter if the billing cycle rolled over
+      if (isBillingCycleExpired(profile.billing_cycle_start)) {
+        await supabase.from('profiles').update({
+          monthly_event_count: 0,
+          billing_cycle_start: new Date().toISOString().slice(0, 10),
+        }).eq('id', ownerId)
+        currentCount = 0
+      }
+
+      const limit = LIMITS[plan].events_per_month
+      if (currentCount >= limit) {
+        return NextResponse.json(
+          { error: 'Monthly event limit reached. Upgrade to Pro to continue ingesting events.', code: 'event_limit' },
+          { status: 429, headers: CORS_HEADERS }
+        )
+      }
+    }
+  }
+  // ──────────────────────────────────────────────────────────────────────────
+
   // Fetch active ingest filters for this project
   const { data: activeFilters } = await supabase
     .from('ingest_filters')
@@ -103,7 +139,7 @@ export async function POST(request: Request) {
 
   const filteredFingerprints = new Set(
     (activeFilters ?? [])
-      .filter((f) => !f.event_type)  // null event_type = match all types
+      .filter((f) => !f.event_type)
       .map((f) => f.fingerprint)
   )
   const filteredByType = new Map(
@@ -143,6 +179,19 @@ export async function POST(request: Request) {
   if (insertError) {
     console.error('Ingest insert error:', insertError)
     return NextResponse.json({ error: 'Failed to store errors' }, { status: 500, headers: CORS_HEADERS })
+  }
+
+  // Increment the monthly event counter
+  if (ownerId) {
+    await supabase.rpc('increment_event_count', { user_id: ownerId, amount: records.length })
+      .then(({ error }) => {
+        if (error) {
+          // Fallback: plain update (slightly racy but acceptable)
+          supabase.from('profiles')
+            .update({ monthly_event_count: (records.length) })
+            .eq('id', ownerId)
+        }
+      })
   }
 
   const filtered = allRecords.length - records.length

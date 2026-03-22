@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createServerClient } from '@/lib/supabase/server'
+import { createServerClient, createServiceRoleClient } from '@/lib/supabase/server'
+import { LIMITS, type Plan } from '@/lib/plans'
 
 
 const CreateProjectSchema = z.object({
@@ -52,6 +53,20 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid input', details: parsed.error.flatten() }, { status: 422 })
   }
+
+  // ── Project count limit ───────────────────────────────────────────────────
+  const service = createServiceRoleClient()
+  await service.from('profiles').upsert({ id: user.id }, { onConflict: 'id', ignoreDuplicates: true })
+  const [{ data: profile }, { count: projectCount }] = await Promise.all([
+    service.from('profiles').select('plan').eq('id', user.id).single(),
+    supabase.from('projects').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
+  ])
+  const plan = ((profile?.plan ?? 'free') as Plan)
+  const projectLimit = LIMITS[plan].projects
+  if ((projectCount ?? 0) >= projectLimit) {
+    return NextResponse.json({ error: 'Project limit reached. Upgrade to Pro for unlimited projects.', code: 'project_limit' }, { status: 403 })
+  }
+  // ──────────────────────────────────────────────────────────────────────────
 
   const { data, error } = await supabase
     .from('projects')

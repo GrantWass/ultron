@@ -5,6 +5,7 @@ import Link from 'next/link'
 import type { ProjectWithOwnerFlag } from '@ultron/types'
 import { formatDate } from '@/lib/utils'
 import { Plus, Trash2, Key, AlertCircle, GitBranch, UserCheck } from 'lucide-react'
+import { UpgradeModal } from '@/components/upgrade-modal'
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<ProjectWithOwnerFlag[]>([])
@@ -14,6 +15,7 @@ export default function ProjectsPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
+  const [showProjectUpgrade, setShowProjectUpgrade] = useState(false)
 
   async function fetchProjects() {
     const res = await fetch('/api/projects')
@@ -42,7 +44,12 @@ export default function ProjectsPage() {
       fetchProjects()
     } else {
       const data = await res.json()
-      setError(data.error ?? 'Failed to create project')
+      if (res.status === 403 && data.code === 'project_limit') {
+        setShowCreate(false)
+        setShowProjectUpgrade(true)
+      } else {
+        setError(data.error ?? 'Failed to create project')
+      }
     }
     setCreating(false)
   }
@@ -61,6 +68,7 @@ export default function ProjectsPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-3xl">
+      {showProjectUpgrade && <UpgradeModal reason="projects" onClose={() => setShowProjectUpgrade(false)} />}
       <div className="flex items-center justify-between mb-6 gap-3">
         <div>
           <h1 className="text-xl font-semibold">Projects</h1>
