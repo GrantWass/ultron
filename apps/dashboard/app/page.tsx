@@ -5,6 +5,30 @@ import {
   ArrowRight, Check, Package, Clock,
 } from 'lucide-react'
 
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'Ultron',
+  url: 'https://ultron.live',
+  description:
+    'Lightweight error monitoring for developers and small teams. Catch JS errors, slow network requests, and web vitals — then let AI tell you exactly how to fix them.',
+  applicationCategory: 'DeveloperApplication',
+  operatingSystem: 'Web',
+  offers: {
+    '@type': 'Offer',
+    price: '0',
+    priceCurrency: 'USD',
+  },
+  featureList: [
+    'JavaScript error tracking',
+    'Network request monitoring',
+    'Web vitals monitoring',
+    'Session replay',
+    'AI fix suggestions',
+    'GitHub integration',
+  ],
+}
+
 export default async function RootPage() {
   const supabase = await createServerClient()
   const { data: { session } } = await supabase.auth.getSession()
@@ -12,6 +36,10 @@ export default async function RootPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
 
       {/* ── Nav ──────────────────────────────────────────────────────────── */}
       <nav className="fixed top-0 inset-x-0 z-50 flex items-center justify-between px-6 py-4 border-b border-border/50 bg-background/80 backdrop-blur-sm">
@@ -64,7 +92,7 @@ export default async function RootPage() {
           <p className="text-lg text-muted-foreground text-center max-w-2xl mx-auto mb-10 leading-relaxed">
             Lightweight error monitoring for single devs and small teams. Catch JS errors,
             slow network requests, and web vitals across all of your projects — then let AI tell you exactly how to fix them.
-            Paste 3 lines and you're live.
+            Drop in a snippet and you're live.
           </p>
 
           {/* CTAs */}
@@ -173,14 +201,14 @@ export default async function RootPage() {
         </div>
       </section>
 
-      {/* ── 3-line integration ───────────────────────────────────────────── */}
+      {/* ── Integration snippet ──────────────────────────────────────────── */}
       <section className="py-16 px-6 border-y border-border bg-muted/20">
         <div className="max-w-3xl mx-auto text-center">
           <p className="text-sm font-medium text-muted-foreground mb-4 uppercase tracking-wider">Setup in under 60 seconds</p>
           <pre className="text-left text-sm font-mono bg-background border border-border rounded-lg p-5 overflow-x-auto leading-relaxed shadow-sm">
             <span className="text-muted-foreground">{`# 1. install`}</span>{'\n'}
             {'npm install @ultron-dev/tracker\n\n'}
-            <span className="text-muted-foreground">{`# 2. drop in 3 lines`}</span>{'\n'}
+            <span className="text-muted-foreground">{`# 2. initialize`}</span>{'\n'}
             <span className="text-primary">{'import'}</span>{' { initTracker } '}<span className="text-primary">{'from'}</span>{' '}<span className="text-green-600 dark:text-green-400">{`'@ultron-dev/tracker'`}</span>{'\n\n'}
             {'initTracker({\n'}
             {'  apiKey: '}<span className="text-green-600 dark:text-green-400">{`'your-api-key'`}</span>{',\n'}
@@ -258,7 +286,7 @@ export default async function RootPage() {
               <Zap className="h-3 w-3" /> Ultron
             </div>
             {[
-              ['Complex setup with source maps, releases, DSN config', '3 lines of code, live in 60 seconds'],
+              ['Complex setup with source maps, releases, DSN config', 'One snippet, live in 60 seconds'],
               ['50–200kb SDK that slows your app', 'Lightweight bundle, minimal overhead'],
               ['Alerts with no guidance', 'AI fix suggestions tied to your source code'],
               ['$26–$80+/mo for small teams', 'Simple, affordable pricing'],
@@ -296,7 +324,7 @@ export default async function RootPage() {
               {
                 n: '2',
                 icon: <Zap className="h-4 w-4" />,
-                title: 'Add 3 lines to your app',
+                title: 'Add it to your app',
                 desc: 'Call initTracker once at startup. No config files, no build steps, no source map uploads.',
                 code: `initTracker({ apiKey: '...' })`,
               },
@@ -342,7 +370,7 @@ export default async function RootPage() {
           <h2 className="text-3xl font-bold tracking-tight">Start catching bugs today.</h2>
           <p className="text-muted-foreground text-sm">
             Free to start. No credit card. No complex setup.<br />
-            Just paste 3 lines and know the moment something breaks.
+            Just drop it in and know the moment something breaks.
           </p>
           <Link
             href="/login"

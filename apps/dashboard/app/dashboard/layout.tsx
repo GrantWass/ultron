@@ -1,5 +1,10 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createServerClient, createServiceRoleClient } from '@/lib/supabase/server'
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+}
 import { SidebarWrapper } from '@/components/sidebar-wrapper'
 import type { ProjectWithOwnerFlag } from '@ultron/types'
 

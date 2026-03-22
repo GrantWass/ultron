@@ -1,0 +1,41 @@
+# Ultron
+
+> AI-powered error monitoring for developers and small teams.
+
+Ultron is a lightweight, developer-first error tracking platform that captures JavaScript errors, slow network requests, web vitals, and resource failures from web applications. When an error occurs, Ultron uses AI to analyze the stack trace and connected source code to suggest an exact fix — not just a description of the problem.
+
+## What Ultron does
+
+- **Error tracking**: Captures unhandled JS exceptions and promise rejections with full stack traces, browser, OS, and viewport context.
+- **Network monitoring**: Tracks failed or slow HTTP requests including status codes, timing breakdowns (DNS, TCP, TLS, TTFB, Transfer), and request metadata.
+- **Web vitals**: Monitors Core Web Vitals (LCP, CLS, INP, FCP, TTFB) with per-page scores and ratings.
+- **Session replay**: Records user sessions so developers can watch exactly what a user experienced when an error occurred.
+- **AI fix suggestions**: Connects to a GitHub repository to pull relevant source files, then uses an AI model to produce a root cause analysis and a unified diff showing the exact code change needed.
+- **AI trends analysis**: Analyzes the last 50 events to surface recurring error patterns, problematic pages, browser/OS clusters, and time-based spikes.
+- **Ingest filters**: Allows teams to suppress known noise patterns from being recorded.
+- **Team collaboration**: Projects support multiple members via invite links.
+
+## How to integrate
+
+Add this to any web application:
+
+```js
+import { initTracker } from '@ultron-dev/tracker'
+initTracker({ apiKey: 'YOUR_API_KEY' })
+```
+
+The npm package (`@ultron-dev/tracker`) is under 5 KB gzipped. No build step required. Works with any framework.
+
+## Pricing
+
+Free to start. No credit card required. No setup fee.
+
+## Target users
+
+Individual developers and small engineering teams who want actionable error monitoring without the complexity or cost of enterprise tools like Sentry or Datadog.
+
+## Links
+
+- Homepage: https://ultron.live
+- Sign up: https://ultron.live/login
+- npm package: https://www.npmjs.com/package/@ultron-dev/tracker
