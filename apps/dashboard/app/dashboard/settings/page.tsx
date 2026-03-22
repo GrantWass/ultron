@@ -270,11 +270,6 @@ function SettingsContent() {
                   </span>
                 )}
               </div>
-              {usage?.plan === 'free' && (
-                <p className="text-xs text-muted-foreground">
-                  {usage.events.used.toLocaleString()} / {usage.events.limit.toLocaleString()} events · {usage.ai.used} / {usage.ai.limit} AI fixes this week
-                </p>
-              )}
             </div>
             {usage?.plan === 'pro' ? (
               <button
