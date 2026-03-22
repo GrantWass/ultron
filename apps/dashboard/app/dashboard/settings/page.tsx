@@ -246,6 +246,94 @@ function SettingsContent() {
         </p>
       </div>
 
+      {/* Billing */}
+      <div className="space-y-3">
+        <h2 className="text-sm font-semibold flex items-center gap-2">
+          <CreditCard className="h-4 w-4" />
+          Plan &amp; Billing
+        </h2>
+
+        {billingSuccess && (
+          <div className="rounded-md border border-green-200 bg-green-50 dark:border-green-900/50 dark:bg-green-900/20 px-4 py-3 text-sm text-green-700 dark:text-green-400">
+            You&apos;re now on Pro. Thanks for upgrading!
+          </div>
+        )}
+
+        <div className="rounded-md border border-border overflow-hidden">
+          <div className="px-4 py-3 flex items-center justify-between">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium capitalize">{usage?.plan ?? 'Free'} plan</span>
+                {usage?.plan === 'pro' && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                    <Zap className="h-2.5 w-2.5" /> PRO
+                  </span>
+                )}
+              </div>
+              {usage?.plan === 'free' && (
+                <p className="text-xs text-muted-foreground">
+                  {usage.events.used.toLocaleString()} / {usage.events.limit.toLocaleString()} events · {usage.ai.used} / {usage.ai.limit} AI fixes this week
+                </p>
+              )}
+            </div>
+            {usage?.plan === 'pro' ? (
+              <button
+                disabled={billingLoading}
+                onClick={async () => {
+                  setBillingLoading(true)
+                  const res = await fetch('/api/billing/portal', { method: 'POST' })
+                  const { url } = await res.json()
+                  if (url) window.location.href = url
+                  else setBillingLoading(false)
+                }}
+                className="text-xs text-muted-foreground hover:text-foreground underline transition-colors disabled:opacity-50"
+              >
+                {billingLoading ? 'Loading…' : 'Manage subscription'}
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowUpgrade(true)}
+                className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                <Zap className="h-3 w-3" />
+                Upgrade to Pro
+              </button>
+            )}
+          </div>
+
+          {usage?.plan === 'free' && (
+            <div className="border-t border-border px-4 py-3 grid grid-cols-3 gap-4">
+              {[
+                { label: 'Events / mo', used: usage.events.used, limit: usage.events.limit },
+                { label: 'AI fixes / wk', used: usage.ai.used,    limit: usage.ai.limit },
+              ].map(({ label, used, limit }) => {
+                const pct = Math.min((used / limit) * 100, 100)
+                const isWarn = pct >= 80
+                const isOver = pct >= 100
+                return (
+                  <div key={label} className="space-y-1 col-span-1">
+                    <div className="flex justify-between text-[10px] text-muted-foreground">
+                      <span>{label}</span>
+                      <span className={isOver ? 'text-destructive font-medium' : isWarn ? 'text-yellow-600 dark:text-yellow-400 font-medium' : ''}>
+                        {used.toLocaleString()} / {limit.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="h-1 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${isOver ? 'bg-destructive' : isWarn ? 'bg-yellow-500' : 'bg-primary/60'}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {showUpgrade && <UpgradeModal reason="events" onClose={() => setShowUpgrade(false)} />}
+
       {/* API Key + SDK Setup */}
       {selectedProject && (
         <div className="space-y-3">
@@ -434,94 +522,6 @@ initTracker({
 
         </div>
       </div>
-
-      {/* Billing */}
-      <div className="space-y-3">
-        <h2 className="text-sm font-semibold flex items-center gap-2">
-          <CreditCard className="h-4 w-4" />
-          Plan &amp; Billing
-        </h2>
-
-        {billingSuccess && (
-          <div className="rounded-md border border-green-200 bg-green-50 dark:border-green-900/50 dark:bg-green-900/20 px-4 py-3 text-sm text-green-700 dark:text-green-400">
-            You&apos;re now on Pro. Thanks for upgrading!
-          </div>
-        )}
-
-        <div className="rounded-md border border-border overflow-hidden">
-          <div className="px-4 py-3 flex items-center justify-between">
-            <div className="space-y-0.5">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium capitalize">{usage?.plan ?? 'Free'} plan</span>
-                {usage?.plan === 'pro' && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                    <Zap className="h-2.5 w-2.5" /> PRO
-                  </span>
-                )}
-              </div>
-              {usage?.plan === 'free' && (
-                <p className="text-xs text-muted-foreground">
-                  {usage.events.used.toLocaleString()} / {usage.events.limit.toLocaleString()} events · {usage.ai.used} / {usage.ai.limit} AI fixes this week
-                </p>
-              )}
-            </div>
-            {usage?.plan === 'pro' ? (
-              <button
-                disabled={billingLoading}
-                onClick={async () => {
-                  setBillingLoading(true)
-                  const res = await fetch('/api/billing/portal', { method: 'POST' })
-                  const { url } = await res.json()
-                  if (url) window.location.href = url
-                  else setBillingLoading(false)
-                }}
-                className="text-xs text-muted-foreground hover:text-foreground underline transition-colors disabled:opacity-50"
-              >
-                {billingLoading ? 'Loading…' : 'Manage subscription'}
-              </button>
-            ) : (
-              <button
-                onClick={() => setShowUpgrade(true)}
-                className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-              >
-                <Zap className="h-3 w-3" />
-                Upgrade to Pro
-              </button>
-            )}
-          </div>
-
-          {usage?.plan === 'free' && (
-            <div className="border-t border-border px-4 py-3 grid grid-cols-3 gap-4">
-              {[
-                { label: 'Events / mo', used: usage.events.used, limit: usage.events.limit },
-                { label: 'AI fixes / wk', used: usage.ai.used,    limit: usage.ai.limit },
-              ].map(({ label, used, limit }) => {
-                const pct = Math.min((used / limit) * 100, 100)
-                const isWarn = pct >= 80
-                const isOver = pct >= 100
-                return (
-                  <div key={label} className="space-y-1 col-span-1">
-                    <div className="flex justify-between text-[10px] text-muted-foreground">
-                      <span>{label}</span>
-                      <span className={isOver ? 'text-destructive font-medium' : isWarn ? 'text-yellow-600 dark:text-yellow-400 font-medium' : ''}>
-                        {used.toLocaleString()} / {limit.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="h-1 rounded-full bg-muted overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${isOver ? 'bg-destructive' : isWarn ? 'bg-yellow-500' : 'bg-primary/60'}`}
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {showUpgrade && <UpgradeModal reason="events" onClose={() => setShowUpgrade(false)} />}
 
       {/* Sign out */}
       <div className="border-t border-border pt-6">
