@@ -7,8 +7,9 @@ import { EventTypeBadge } from '@/components/event-badge'
 import type { ErrorRecord, EventType } from '@ultron/types'
 import {
   Search, AlertCircle, RefreshCw, X, CheckCircle,
-  ChevronDown, Clock, Globe, Wifi, Monitor, Trash2, Ban, ChevronRight,
+  ChevronDown, Clock, Globe, Wifi, Monitor, Trash2, Ban, ChevronRight, Sparkles,
 } from 'lucide-react'
+import { TrendsDrawer } from '@/components/trends-drawer'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -390,6 +391,7 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
   const [filterTarget, setFilterTarget]   = useState<ErrorRecord | null>(null)
   const [savingFilter, setSavingFilter]   = useState(false)
   const [filters, setFilters]             = useState<IngestFilter[]>([])
+  const [trendsOpen, setTrendsOpen]       = useState(false)
 
   // Filter state
   const [search, setSearch]         = useState('')
@@ -600,6 +602,14 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
             </button>
           )}
           <button
+            onClick={() => setTrendsOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-md border border-input px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            title="AI Trends Analysis"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            Analyze
+          </button>
+          <button
             onClick={fetchErrors}
             className="rounded-md border border-input p-1.5 hover:bg-accent transition-colors"
             title="Refresh"
@@ -780,6 +790,14 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
           onConfirm={confirmResolve}
           onCancel={() => { if (!resolving) setResolveTarget(null) }}
           resolving={resolving}
+        />
+      )}
+
+      {/* ── Trends drawer ─────────────────────────────────────────────────── */}
+      {trendsOpen && (
+        <TrendsDrawer
+          projectId={activeProjectId}
+          onClose={() => setTrendsOpen(false)}
         />
       )}
 
