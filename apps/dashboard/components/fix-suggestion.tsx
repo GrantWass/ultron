@@ -290,7 +290,7 @@ export function FixSuggestion({ errorId, projectId, existingSuggestion, githubRe
       {isLoading && !displayText && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Analyzing error and fetching relevant files…
+          {githubRepo ? 'Analyzing error and fetching relevant files…' : 'Analyzing error…'}
         </div>
       )}
 

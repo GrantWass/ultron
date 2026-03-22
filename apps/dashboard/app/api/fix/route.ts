@@ -139,7 +139,7 @@ export async function POST(request: Request) {
 
   // Get GitHub token from project owner's user connection
   const projectOwnerId = error.projects.user_id
-  const githubConn = error.projects.github_connections[0] ?? null
+  const githubConn = (error.projects.github_connections ?? [])[0] ?? null
 
   let accessToken: string | null = null
   if (githubConn?.repo_owner && githubConn?.repo_name && projectOwnerId) {
