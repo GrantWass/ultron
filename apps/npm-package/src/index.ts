@@ -18,12 +18,15 @@ let instance: UltronTracker | null = null
  * })
  * ```
  */
-export function initTracker(config: TrackerConfig): UltronTracker {
+export function initTracker(config: TrackerConfig): UltronTracker | null {
   if (instance) {
     instance.destroy()
   }
 
-  if (!config.apiKey) throw new Error('[Ultron] apiKey is required')
+  if (!config.apiKey) {
+    console.error('[Ultron] apiKey is required — tracker not initialized')
+    return null
+  }
 
   const normalizedConfig: TrackerConfig = { ...config }
 

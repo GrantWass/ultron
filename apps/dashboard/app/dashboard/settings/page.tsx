@@ -36,7 +36,6 @@ export function Ultron() {
   useEffect(() => {
     initTracker({
       apiKey: '${apiKey}',
-      debug: process.env.NODE_ENV === 'development',
     })
   }, [])
   return null
@@ -55,7 +54,6 @@ import App from './App'
 
 initTracker({
   apiKey: '${apiKey}',
-  debug: import.meta.env.DEV,
 })
 
 createRoot(document.getElementById('root')!).render(
@@ -71,7 +69,6 @@ import App from './App.vue'
 
 initTracker({
   apiKey: '${apiKey}',
-  debug: import.meta.env.DEV,
 })
 
 createApp(App).mount('#app')`
@@ -84,7 +81,6 @@ import { PUBLIC_ULTRON_API_KEY } from '$env/static/public'
 
 initTracker({
   apiKey: PUBLIC_ULTRON_API_KEY,
-  debug: import.meta.env.DEV,
 })
 
 // .env
@@ -157,7 +153,17 @@ function SdkSetupCollapsible({ apiKey }: { apiKey: string }) {
           ))}
         </div>
       </div>
-      {open && <SdkSetup apiKey={apiKey} framework={framework} />}
+      {open && (
+        <>
+          <SdkSetup apiKey={apiKey} framework={framework} />
+          <div className="px-4 py-3 border-t border-border bg-muted/20 text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">Tip:</span> Add{' '}
+            <code className="font-mono bg-muted px-1 py-0.5 rounded text-xs">debug: true</code>{' '}
+            (or <code className="font-mono bg-muted px-1 py-0.5 rounded text-xs">debug: process.env.NODE_ENV === &apos;development&apos;</code>)
+            {' '}to log queued errors and flush activity to the console during development. Remove it before shipping to production.
+          </div>
+        </>
+      )}
     </div>
   )
 }

@@ -113,6 +113,19 @@ All types are exported:
 import type { TrackerConfig, SessionReplayConfig } from '@ultron-dev/tracker'
 ```
 
+## Best practices
+
+**Enable debug logging in development**
+
+Set `debug: true` when initializing in non-production environments to get console output for queued errors, flush results, and initialization state. Remove it (or gate it behind an env check) before shipping to production.
+
+```ts
+initTracker({
+  apiKey: process.env.NEXT_PUBLIC_ULTRON_API_KEY!,
+  debug: process.env.NODE_ENV !== 'production',
+})
+```
+
 ## License
 
 MIT
