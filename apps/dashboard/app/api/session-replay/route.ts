@@ -10,7 +10,7 @@ export const runtime = 'nodejs'
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, x-api-key',
+  'Access-Control-Allow-Headers': 'Content-Type, Content-Encoding, x-api-key',
 }
 
 export async function OPTIONS() {

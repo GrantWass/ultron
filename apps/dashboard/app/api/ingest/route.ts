@@ -57,12 +57,12 @@ export async function POST(request: Request) {
   try {
     body = await request.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400, headers: CORS_HEADERS })
   }
 
   const apiKey = headerKey ?? body.api_key
   if (!apiKey) {
-    return NextResponse.json({ error: 'Missing API key' }, { status: 400 })
+    return NextResponse.json({ error: 'Missing API key' }, { status: 400, headers: CORS_HEADERS })
   }
 
   const { success, reset } = await ingestRatelimit.limit(apiKey)
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
       { error: 'Rate limit exceeded' },
       {
         status: 429,
-        headers: { 'Retry-After': String(Math.ceil((reset - Date.now()) / 1000)) },
+        headers: { ...CORS_HEADERS, 'Retry-After': String(Math.ceil((reset - Date.now()) / 1000)) },
       }
     )
   }
@@ -84,14 +84,14 @@ export async function POST(request: Request) {
     .single()
 
   if (projectError || !project) {
-    return NextResponse.json({ error: 'Invalid API key' }, { status: 401 })
+    return NextResponse.json({ error: 'Invalid API key' }, { status: 401, headers: CORS_HEADERS })
   }
 
   const parsed = IngestSchema.safeParse(body)
   if (!parsed.success) {
     return NextResponse.json(
       { error: 'Invalid payload', details: parsed.error.flatten() },
-      { status: 422 }
+      { status: 422, headers: CORS_HEADERS }
     )
   }
 
