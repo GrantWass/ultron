@@ -3,9 +3,13 @@
 import { useState } from 'react'
 import { X, Zap, Check } from 'lucide-react'
 
-export type UpgradeReason = 'events' | 'ai' | 'projects' | 'collaborators'
+export type UpgradeReason = 'events' | 'ai' | 'projects' | 'collaborators' | 'upgrade'
 
 const REASON_COPY: Record<UpgradeReason, { title: string; body: string }> = {
+  upgrade: {
+    title: "Unlock more with Pro",
+    body:  "Get 500,000 events/month, 500 AI fix suggestions/week, unlimited projects and collaborators, and 90-day data retention.",
+  },
   events: {
     title: "You've used all your events this month",
     body:  "Your free plan includes 5,000 events per month. New events are being dropped until the next billing cycle or you upgrade.",

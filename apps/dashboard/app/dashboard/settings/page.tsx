@@ -333,7 +333,7 @@ function SettingsContent() {
         </div>
       </div>
 
-      {showUpgrade && <UpgradeModal reason="events" onClose={() => setShowUpgrade(false)} />}
+      {showUpgrade && <UpgradeModal reason="upgrade" onClose={() => setShowUpgrade(false)} />}
 
       {/* API Key + SDK Setup */}
       {selectedProject && (

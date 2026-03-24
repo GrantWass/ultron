@@ -210,7 +210,7 @@ export function Sidebar({ projects, currentProjectId, pendingInvites, usage, isO
       )}
 
       {upgradeOpen && (
-        <UpgradeModal reason="events" onClose={() => setUpgradeOpen(false)} />
+        <UpgradeModal reason="upgrade" onClose={() => setUpgradeOpen(false)} />
       )}
     </aside>
   )
