@@ -5,6 +5,7 @@
     "dev": "pnpm --filter dashboard dev",
     "build": "pnpm --filter @ultron/types build && pnpm --filter dashboard build",
     "build:sdk": "pnpm --filter @ultron/tracker build",
+    "dev:demo": "pnpm --filter ./apps/npm-package build && pnpm --filter demo dev",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck"
   },

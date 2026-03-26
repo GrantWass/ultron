@@ -8,14 +8,18 @@ import type { IngestPayload } from '@ultron/types'
 
 export const runtime = 'nodejs'
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, x-api-key',
+function getCorsHeaders(request: Request) {
+  const origin = request.headers.get('origin') ?? '*'
+  return {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, x-api-key',
+    'Access-Control-Allow-Credentials': 'true',
+  }
 }
 
-export async function OPTIONS() {
-  return new Response(null, { status: 204, headers: CORS_HEADERS })
+export async function OPTIONS(request: Request) {
+  return new Response(null, { status: 204, headers: getCorsHeaders(request) })
 }
 
 const EventTypeSchema = z.enum(['error', 'network', 'vital', 'resource_error']).default('error')
@@ -51,6 +55,7 @@ function createServiceClient() {
 }
 
 export async function POST(request: Request) {
+  const CORS_HEADERS = getCorsHeaders(request)
   const headerKey = request.headers.get('x-api-key')
 
   let body: IngestPayload & { api_key?: string }
