@@ -28,15 +28,19 @@ export function isPro(plan: Plan): boolean {
 }
 
 /** Returns true if the billing cycle (monthly) has rolled over */
-export function isBillingCycleExpired(cycleStart: string): boolean {
+export function isBillingCycleExpired(cycleStart: string | null | undefined): boolean {
+  if (!cycleStart) return true
   const start = new Date(cycleStart)
+  if (isNaN(start.getTime())) return true
   const now = new Date()
   return start.getFullYear() !== now.getFullYear() || start.getMonth() !== now.getMonth()
 }
 
 /** Returns true if the weekly AI counter window (7 days) has elapsed */
-export function isWeekExpired(resetAt: string): boolean {
+export function isWeekExpired(resetAt: string | null | undefined): boolean {
+  if (!resetAt) return true
   const reset = new Date(resetAt)
+  if (isNaN(reset.getTime())) return true
   const now = new Date()
   return now.getTime() - reset.getTime() > 7 * 24 * 60 * 60 * 1000
 }

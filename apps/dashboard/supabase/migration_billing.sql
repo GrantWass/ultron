@@ -77,3 +77,40 @@ $$ language sql security definer;
 insert into public.profiles (id)
 select id from auth.users
 on conflict (id) do nothing;
+
+-- 9. Atomic check-and-increment for monthly_event_count.
+-- Locks the profile row, checks the current count against the limit, and
+-- increments only if allowed — eliminating the TOCTOU race in the ingest route.
+-- Returns true if the increment was applied, false if the limit was already reached.
+create or replace function public.check_and_increment_event_count(
+  p_user_id uuid,
+  p_amount   int,
+  p_limit    int
+) returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_current int;
+begin
+  select monthly_event_count into v_current
+  from public.profiles
+  where id = p_user_id
+  for update;
+
+  if not found then
+    return false;
+  end if;
+
+  if v_current >= p_limit then
+    return false;
+  end if;
+
+  update public.profiles
+  set monthly_event_count = monthly_event_count + p_amount
+  where id = p_user_id;
+
+  return true;
+end;
+$$;

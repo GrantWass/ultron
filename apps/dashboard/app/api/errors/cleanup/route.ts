@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
+import { createServerClient, createServiceRoleClient } from '@/lib/supabase/server'
+import { LIMITS } from '@/lib/plans'
 
-
-// Called by Vercel cron (vercel.json) to delete errors older than 30 days.
+// Called by Vercel cron (vercel.json) to delete errors per plan retention policy.
 // Also callable manually by authenticated users.
 export async function GET(request: Request) {
-  // Allow Vercel cron requests (no auth) or authenticated users
   const authHeader = request.headers.get('authorization')
   const isCron = authHeader === `Bearer ${process.env.CRON_SECRET}`
 
@@ -15,15 +14,37 @@ export async function GET(request: Request) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const supabase = await createServerClient()
-  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+  // Service role bypasses RLS so the cron can delete across all projects.
+  const service = createServiceRoleClient()
 
-  const { error, count } = await supabase
-    .from('errors')
-    .delete({ count: 'exact' })
-    .lt('created_at', cutoff)
+  const freeCutoff = new Date(Date.now() - LIMITS.free.retention_days * 24 * 60 * 60 * 1000).toISOString()
+  const proCutoff  = new Date(Date.now() - LIMITS.pro.retention_days  * 24 * 60 * 60 * 1000).toISOString()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  // Separate project IDs by their owner's plan.
+  const [{ data: profiles }, { data: projects }] = await Promise.all([
+    service.from('profiles').select('id, plan'),
+    service.from('projects').select('id, user_id'),
+  ])
 
-  return NextResponse.json({ deleted: count ?? 0, cutoff })
+  const proUserIds    = new Set((profiles ?? []).filter(p => p.plan === 'pro').map(p => p.id))
+  const freeProjectIds = (projects ?? []).filter(p => !proUserIds.has(p.user_id)).map(p => p.id)
+  const proProjectIds  = (projects ?? []).filter(p =>  proUserIds.has(p.user_id)).map(p => p.id)
+
+  const [freeResult, proResult] = await Promise.all([
+    freeProjectIds.length > 0
+      ? service.from('errors').delete({ count: 'exact' }).in('project_id', freeProjectIds).lt('created_at', freeCutoff)
+      : { error: null, count: 0 },
+    proProjectIds.length > 0
+      ? service.from('errors').delete({ count: 'exact' }).in('project_id', proProjectIds).lt('created_at', proCutoff)
+      : { error: null, count: 0 },
+  ])
+
+  if (freeResult.error) return NextResponse.json({ error: freeResult.error.message }, { status: 500 })
+  if (proResult.error)  return NextResponse.json({ error: proResult.error.message  }, { status: 500 })
+
+  return NextResponse.json({
+    deleted: (freeResult.count ?? 0) + (proResult.count ?? 0),
+    free: { deleted: freeResult.count ?? 0, cutoff: freeCutoff },
+    pro:  { deleted: proResult.count  ?? 0, cutoff: proCutoff  },
+  })
 }

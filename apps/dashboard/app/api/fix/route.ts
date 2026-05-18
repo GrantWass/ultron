@@ -115,7 +115,29 @@ export async function POST(request: Request) {
     }
   }
 
-  // ── Weekly AI limit check (skip if cached suggestion exists) ─────────────
+  // Cached suggestions are free — check before touching the rate limit counter.
+  const { data: existing } = await service
+    .from('fix_suggestions')
+    .select('suggestion')
+    .eq('error_id', errorId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (existing) {
+    const encoder = new TextEncoder()
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode(`0:"${existing.suggestion.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"\n`))
+        controller.close()
+      },
+    })
+    return new Response(stream, {
+      headers: { 'Content-Type': 'text/event-stream' },
+    })
+  }
+
+  // ── Weekly AI limit check ─────────────────────────────────────────────────
   await service.from('profiles').upsert({ id: user.id }, { onConflict: 'id', ignoreDuplicates: true })
   const { data: profile } = await service
     .from('profiles')
@@ -139,29 +161,6 @@ export async function POST(request: Request) {
     }
   }
   // ──────────────────────────────────────────────────────────────────────────
-
-  // Check for existing suggestion
-  const { data: existing } = await service
-    .from('fix_suggestions')
-    .select('suggestion')
-    .eq('error_id', errorId)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single()
-
-  if (existing) {
-    // Return cached suggestion as a stream
-    const encoder = new TextEncoder()
-    const stream = new ReadableStream({
-      start(controller) {
-        controller.enqueue(encoder.encode(`0:"${existing.suggestion.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"\n`))
-        controller.close()
-      },
-    })
-    return new Response(stream, {
-      headers: { 'Content-Type': 'text/event-stream' },
-    })
-  }
 
   // Get GitHub token from project owner's user connection
   const projectOwnerId = error.projects.user_id
@@ -234,6 +233,19 @@ export async function DELETE(request: Request) {
   if (!error_id) return new Response(JSON.stringify({ error: 'error_id required' }), { status: 400 })
 
   const service = createServiceRoleClient()
+
+  // Verify the caller owns the project this error belongs to.
+  const { data: errorRow } = await service
+    .from('errors')
+    .select('project_id, projects!inner(user_id)')
+    .eq('id', error_id)
+    .single()
+
+  if (!errorRow) return new Response(JSON.stringify({ error: 'Not found' }), { status: 404 })
+
+  const owner = (errorRow.projects as unknown as { user_id: string }).user_id
+  if (owner !== user.id) return new Response(JSON.stringify({ error: 'Not found' }), { status: 404 })
+
   await service.from('fix_suggestions').delete().eq('error_id', error_id)
   return new Response(null, { status: 204 })
 }

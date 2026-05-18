@@ -100,42 +100,6 @@ export async function POST(request: Request) {
     )
   }
 
-  // ── Plan limit check ───────────────────────────────────────────────────────
-  const ownerId = project.user_id
-  if (ownerId) {
-    // Ensure profile exists
-    await supabase.from('profiles').upsert({ id: ownerId }, { onConflict: 'id', ignoreDuplicates: true })
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('plan, monthly_event_count, billing_cycle_start')
-      .eq('id', ownerId)
-      .single()
-
-    if (profile) {
-      const plan = (profile.plan ?? 'free') as Plan
-      let currentCount = profile.monthly_event_count ?? 0
-
-      // Reset counter if the billing cycle rolled over
-      if (isBillingCycleExpired(profile.billing_cycle_start)) {
-        await supabase.from('profiles').update({
-          monthly_event_count: 0,
-          billing_cycle_start: new Date().toISOString().slice(0, 10),
-        }).eq('id', ownerId)
-        currentCount = 0
-      }
-
-      const limit = LIMITS[plan].events_per_month
-      if (currentCount >= limit) {
-        return NextResponse.json(
-          { error: 'Monthly event limit reached. Upgrade to Pro to continue ingesting events.', code: 'event_limit' },
-          { status: 429, headers: CORS_HEADERS }
-        )
-      }
-    }
-  }
-  // ──────────────────────────────────────────────────────────────────────────
-
   // Fetch active ingest filters for this project
   const { data: activeFilters } = await supabase
     .from('ingest_filters')
@@ -180,29 +144,52 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: 0, filtered: allRecords.length }, { headers: CORS_HEADERS })
   }
 
+  // ── Atomic plan limit check + increment ───────────────────────────────────
+  const ownerId = project.user_id
+  if (ownerId) {
+    await supabase.from('profiles').upsert({ id: ownerId }, { onConflict: 'id', ignoreDuplicates: true })
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('plan, monthly_event_count, billing_cycle_start')
+      .eq('id', ownerId)
+      .single()
+
+    if (profile) {
+      const plan = (profile.plan ?? 'free') as Plan
+
+      // Reset counter if the billing cycle rolled over
+      if (isBillingCycleExpired(profile.billing_cycle_start)) {
+        await supabase.from('profiles').update({
+          monthly_event_count: 0,
+          billing_cycle_start: new Date().toISOString().slice(0, 10),
+        }).eq('id', ownerId)
+      }
+
+      const limit = LIMITS[plan].events_per_month
+
+      // check_and_increment_event_count locks the profile row, checks the
+      // current count against the limit, and only increments if allowed —
+      // all in one atomic operation, eliminating the TOCTOU race.
+      const { data: allowed, error: rpcError } = await supabase.rpc(
+        'check_and_increment_event_count',
+        { p_user_id: ownerId, p_amount: records.length, p_limit: limit }
+      )
+
+      if (rpcError || allowed === false) {
+        return NextResponse.json(
+          { error: 'Monthly event limit reached. Upgrade to Pro to continue ingesting events.', code: 'event_limit' },
+          { status: 429, headers: CORS_HEADERS }
+        )
+      }
+    }
+  }
+  // ──────────────────────────────────────────────────────────────────────────
+
   const { error: insertError } = await supabase.from('errors').insert(records)
   if (insertError) {
     console.error('Ingest insert error:', insertError)
     return NextResponse.json({ error: 'Failed to store errors' }, { status: 500, headers: CORS_HEADERS })
-  }
-
-  // Increment the monthly event counter
-  if (ownerId) {
-    await supabase.rpc('increment_event_count', { user_id: ownerId, amount: records.length })
-      .then(({ error }) => {
-        if (error) {
-          // Fallback: fetch current count then increment (slightly racy but acceptable)
-          supabase.from('profiles')
-            .select('monthly_event_count')
-            .eq('id', ownerId)
-            .single()
-            .then(({ data }) => {
-              supabase.from('profiles')
-                .update({ monthly_event_count: (data?.monthly_event_count ?? 0) + records.length })
-                .eq('id', ownerId)
-            })
-        }
-      })
   }
 
   const filtered = allRecords.length - records.length
