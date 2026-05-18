@@ -8,6 +8,7 @@ import type { UsageData } from '@/app/dashboard/layout'
 import { AlertCircle, FolderOpen, Settings, Zap, Users, Mail, SlidersHorizontal, BarChart2 } from 'lucide-react'
 import React, { useState } from 'react'
 import { UpgradeModal } from './upgrade-modal'
+import { Tip, Tooltip } from './tip'
 
 interface PendingInvite {
   token: string
@@ -24,6 +25,12 @@ interface SidebarProps {
   onClose?: () => void
 }
 
+const USAGE_TIPS: Record<string, string> = {
+  'Events this month': 'Total events ingested in the current calendar month. Resets on the 1st.',
+  'AI fixes this week': 'AI-powered fix suggestions generated. Resets every 7 days.',
+  'Projects': 'Number of projects in your account.',
+}
+
 function UsageBar({ label, used, limit }: { label: string; used: number; limit: number }) {
   const isUnlimited = !isFinite(limit)
   const pct = isUnlimited ? 0 : Math.min((used / limit) * 100, 100)
@@ -33,7 +40,10 @@ function UsageBar({ label, used, limit }: { label: string; used: number; limit: 
   return (
     <div className="space-y-1">
       <div className="flex justify-between text-[10px] text-muted-foreground">
-        <span>{label}</span>
+        <span className="flex items-center gap-1">
+          {label}
+          {USAGE_TIPS[label] && <Tip text={USAGE_TIPS[label]} />}
+        </span>
         <span className={isOver ? 'text-destructive font-medium' : isWarning ? 'text-yellow-600 dark:text-yellow-400 font-medium' : ''}>
           {isUnlimited ? '∞' : `${used.toLocaleString()} / ${limit.toLocaleString()}`}
         </span>
@@ -91,9 +101,11 @@ export function Sidebar({ projects, currentProjectId, pendingInvites, usage, isO
                   : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
               )}
             >
-              {project.is_owner === false
-                ? <Users className="h-3.5 w-3.5 shrink-0" />
-                : <AlertCircle className="h-3.5 w-3.5 shrink-0" />}
+              <Tooltip text={project.is_owner === false ? "Shared with you — you're a member of this project" : 'You own this project'}>
+                {project.is_owner === false
+                  ? <Users className="h-3.5 w-3.5 shrink-0" />
+                  : <AlertCircle className="h-3.5 w-3.5 shrink-0" />}
+              </Tooltip>
               <span className="truncate">{project.name}</span>
             </Link>
 

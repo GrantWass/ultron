@@ -11,6 +11,7 @@ import {
   RotateCcw, Terminal, Copy, Check, Zap,
 } from 'lucide-react'
 import { TrendsDrawer } from '@/components/trends-drawer'
+import { Tooltip } from '@/components/tip'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -621,17 +622,20 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
               Clear
             </button>
           )}
-          <button
-            onClick={() => setTrendsOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-md border border-input px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
-            title="AI Trends Analysis"
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-            Analyze
-          </button>
-          <button onClick={fetchErrors} className="rounded-md border border-input p-1.5 hover:bg-accent transition-colors" title="Refresh">
-            <RefreshCw className={`h-3.5 w-3.5 text-muted-foreground ${loading ? 'animate-spin' : ''}`} />
-          </button>
+          <Tooltip text="AI trends analysis — summarise patterns across your current error feed">
+            <button
+              onClick={() => setTrendsOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-input px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              Analyze
+            </button>
+          </Tooltip>
+          <Tooltip text="Refresh error list">
+            <button onClick={fetchErrors} className="rounded-md border border-input p-1.5 hover:bg-accent transition-colors">
+              <RefreshCw className={`h-3.5 w-3.5 text-muted-foreground ${loading ? 'animate-spin' : ''}`} />
+            </button>
+          </Tooltip>
         </div>
       </div>
 
@@ -731,16 +735,20 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
                     </p>
                     {/* Occurrence count badge */}
                     {group.count > 1 && (
-                      <span className="shrink-0 inline-flex items-center rounded-full bg-muted border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                        {group.count.toLocaleString()}×
-                      </span>
+                      <Tooltip text={`${group.count.toLocaleString()} occurrences in the selected time range`}>
+                        <span className="shrink-0 inline-flex items-center rounded-full bg-muted border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground cursor-help">
+                          {group.count.toLocaleString()}×
+                        </span>
+                      </Tooltip>
                     )}
                     {/* Regression badge */}
                     {group.is_regression && (
-                      <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-yellow-500/10 border border-yellow-500/20 px-1.5 py-0.5 text-[10px] font-medium text-yellow-600 dark:text-yellow-400">
-                        <RotateCcw className="h-2.5 w-2.5" />
-                        Regression
-                      </span>
+                      <Tooltip text="This error was previously resolved but has reappeared — it may need a deeper fix">
+                        <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-yellow-500/10 border border-yellow-500/20 px-1.5 py-0.5 text-[10px] font-medium text-yellow-600 dark:text-yellow-400 cursor-help">
+                          <RotateCcw className="h-2.5 w-2.5" />
+                          Regression
+                        </span>
+                      </Tooltip>
                     )}
                   </div>
                   <p className="text-[11px] text-muted-foreground mt-0.5">
@@ -753,20 +761,22 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
                   </p>
                 </Link>
 
-                <button
-                  onClick={(e) => { e.preventDefault(); setFilterTarget(group) }}
-                  title="Add ingest filter — drop future events with this fingerprint"
-                  className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-orange-500/10 hover:text-orange-500 mt-0.5"
-                >
-                  <Ban className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  onClick={(e) => { e.preventDefault(); setResolveTarget(group) }}
-                  title="Resolve — delete all errors with this message"
-                  className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive mt-0.5"
-                >
-                  <CheckCircle className="h-3.5 w-3.5" />
-                </button>
+                <Tooltip text="Add ingest filter — future events matching this fingerprint will be silently dropped before storage">
+                  <button
+                    onClick={(e) => { e.preventDefault(); setFilterTarget(group) }}
+                    className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-orange-500/10 hover:text-orange-500 mt-0.5"
+                  >
+                    <Ban className="h-3.5 w-3.5" />
+                  </button>
+                </Tooltip>
+                <Tooltip text="Resolve — delete all occurrences of this error from the database">
+                  <button
+                    onClick={(e) => { e.preventDefault(); setResolveTarget(group) }}
+                    className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive mt-0.5"
+                  >
+                    <CheckCircle className="h-3.5 w-3.5" />
+                  </button>
+                </Tooltip>
               </div>
             )
           })
