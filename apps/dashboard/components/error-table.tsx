@@ -4,12 +4,28 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { formatRelativeTime, truncate } from '@/lib/utils'
 import { EventTypeBadge } from '@/components/event-badge'
-import type { ErrorRecord, EventType } from '@ultron/types'
+import type { EventType } from '@ultron/types'
 import {
   Search, AlertCircle, RefreshCw, X, CheckCircle,
   ChevronDown, Clock, Globe, Wifi, Monitor, Trash2, Ban, ChevronRight, Sparkles,
+  RotateCcw, Terminal, Copy, Check, Zap,
 } from 'lucide-react'
 import { TrendsDrawer } from '@/components/trends-drawer'
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface GroupedError {
+  message_fingerprint: string | null
+  message: string
+  event_type: string
+  count: number
+  first_seen: string
+  last_seen: string
+  sample_url: string | null
+  sample_browser: string | null
+  sample_id: string
+  is_regression: boolean
+}
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -33,9 +49,9 @@ const TIME_RANGES = [
   { value: '30d', label: 'Last 30 days' },
 ]
 
-const BROWSERS = ['Chrome', 'Safari', 'Firefox', 'Edge', 'Samsung Browser', 'Opera']
+const BROWSERS        = ['Chrome', 'Safari', 'Firefox', 'Edge', 'Samsung Browser', 'Opera']
 const OPERATING_SYSTEMS = ['macOS', 'Windows', 'iOS', 'Android', 'Linux']
-const CONNECTIONS = ['wifi', '4g', '3g', '2g', 'slow-2g', 'unknown']
+const CONNECTIONS     = ['wifi', '4g', '3g', '2g', 'slow-2g', 'unknown']
 
 function timeRangeToFrom(range: string): string | null {
   const mins: Record<string, number> = {
@@ -47,19 +63,72 @@ function timeRangeToFrom(range: string): string | null {
   return new Date(Date.now() - mins[range] * 60 * 1000).toISOString()
 }
 
+// ── Onboarding empty state ────────────────────────────────────────────────────
+
+function OnboardingEmptyState() {
+  const [copied, setCopied] = useState(false)
+  const snippet = `npm install @ultron-dev/tracker`
+  const initSnippet = `import { initTracker } from '@ultron-dev/tracker'\n\ninitTracker({ apiKey: 'YOUR_API_KEY' })`
+
+  async function copy() {
+    await navigator.clipboard.writeText(`${snippet}\n\n${initSnippet}`)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="px-4 py-12 flex flex-col items-center text-center gap-4">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+        <Zap className="h-6 w-6 text-primary" />
+      </div>
+      <div>
+        <p className="text-sm font-semibold">No events yet</p>
+        <p className="text-xs text-muted-foreground mt-1 max-w-xs">
+          Install the SDK in your app and your first error will appear here automatically.
+        </p>
+      </div>
+      <div className="w-full max-w-sm text-left rounded-lg border border-border overflow-hidden">
+        <div className="flex items-center justify-between px-3 py-2 bg-muted/50 border-b border-border">
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <Terminal className="h-3 w-3" />
+            Quick start
+          </div>
+          <button
+            onClick={copy}
+            className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+        </div>
+        <pre className="px-3 py-3 text-[11px] font-mono text-foreground/80 leading-relaxed overflow-x-auto bg-background">
+          <span className="text-muted-foreground">$</span> {snippet}{'\n\n'}
+          {initSnippet}
+        </pre>
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        Full setup guides in{' '}
+        <Link href="/dashboard/settings" className="underline underline-offset-2 hover:text-foreground">
+          Settings → SDK Setup
+        </Link>
+      </p>
+    </div>
+  )
+}
+
 // ── Resolve modal ─────────────────────────────────────────────────────────────
 
 interface PreviewRow { id: string; url: string | null; browser: string | null; os: string | null; created_at: string }
 
 interface ResolveModalProps {
-  error: ErrorRecord
+  group: GroupedError
   projectId: string
   onConfirm: () => Promise<void>
   onCancel: () => void
   resolving: boolean
 }
 
-function ResolveModal({ error, projectId, onConfirm, onCancel, resolving }: ResolveModalProps) {
+function ResolveModal({ group, projectId, onConfirm, onCancel, resolving }: ResolveModalProps) {
   const [preview, setPreview] = useState<{ count: number; examples: PreviewRow[] } | null>(null)
 
   useEffect(() => {
@@ -71,14 +140,14 @@ function ResolveModal({ error, projectId, onConfirm, onCancel, resolving }: Reso
   useEffect(() => {
     const params = new URLSearchParams({
       project_id: projectId,
-      message: error.message,
-      event_type: error.event_type ?? 'error',
+      message:    group.message,
+      event_type: group.event_type ?? 'error',
     })
     fetch(`/api/errors/resolve?${params}`)
       .then((r) => r.json())
       .then(setPreview)
       .catch(() => {})
-  }, [projectId, error.message, error.event_type])
+  }, [projectId, group.message, group.event_type])
 
   return (
     <div
@@ -86,7 +155,6 @@ function ResolveModal({ error, projectId, onConfirm, onCancel, resolving }: Reso
       onClick={(e) => { if (e.target === e.currentTarget) onCancel() }}
     >
       <div className="w-full max-w-lg rounded-xl border border-border bg-card shadow-xl">
-        {/* Header */}
         <div className="flex items-start justify-between p-5 pb-4 border-b border-border">
           <div className="flex items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-destructive/10">
@@ -97,7 +165,7 @@ function ResolveModal({ error, projectId, onConfirm, onCancel, resolving }: Reso
               <p className="text-xs text-muted-foreground mt-0.5">
                 {preview ? (
                   <span className="text-destructive font-medium">{preview.count} occurrence{preview.count !== 1 ? 's' : ''} will be deleted</span>
-                ) : 'Loading…'}
+                ) : `~${group.count} occurrences`}
               </p>
             </div>
           </div>
@@ -106,13 +174,11 @@ function ResolveModal({ error, projectId, onConfirm, onCancel, resolving }: Reso
           </button>
         </div>
 
-        {/* Body */}
         <div className="p-5 space-y-4">
           <div className="rounded-md border border-border bg-muted/40 px-3 py-2.5">
-            <p className="font-mono text-xs text-foreground/80 break-all leading-relaxed">{error.message}</p>
+            <p className="font-mono text-xs text-foreground/80 break-all leading-relaxed">{group.message}</p>
           </div>
 
-          {/* Preview rows */}
           {preview && preview.examples.length > 0 && (
             <div className="space-y-1.5">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -134,10 +200,11 @@ function ResolveModal({ error, projectId, onConfirm, onCancel, resolving }: Reso
             </div>
           )}
 
-          <p className="text-xs text-muted-foreground">Only <span className="font-medium text-foreground">{error.event_type}</span> errors with this exact message are affected.</p>
+          <p className="text-xs text-muted-foreground">
+            Only <span className="font-medium text-foreground">{group.event_type}</span> errors with this exact message are affected.
+          </p>
         </div>
 
-        {/* Footer */}
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border">
           <button
             onClick={onCancel}
@@ -151,7 +218,9 @@ function ResolveModal({ error, projectId, onConfirm, onCancel, resolving }: Reso
             disabled={resolving || !preview}
             className="inline-flex items-center gap-2 rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50"
           >
-            {resolving ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" />Resolving…</> : <><CheckCircle className="h-3.5 w-3.5" />Resolve all</>}
+            {resolving
+              ? <><RefreshCw className="h-3.5 w-3.5 animate-spin" />Resolving…</>
+              : <><CheckCircle className="h-3.5 w-3.5" />Resolve all</>}
           </button>
         </div>
       </div>
@@ -172,14 +241,14 @@ interface IngestFilter {
 }
 
 interface FilterModalProps {
-  error: ErrorRecord
+  group: GroupedError
   projectId: string
   onConfirm: (note: string) => Promise<void>
   onCancel: () => void
   saving: boolean
 }
 
-function FilterModal({ error, onConfirm, onCancel, saving }: FilterModalProps) {
+function FilterModal({ group, onConfirm, onCancel, saving }: FilterModalProps) {
   const [note, setNote] = useState('')
 
   useEffect(() => {
@@ -213,7 +282,7 @@ function FilterModal({ error, onConfirm, onCancel, saving }: FilterModalProps) {
           <div className="space-y-1.5">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Message</p>
             <div className="rounded-md border border-border bg-muted/40 px-3 py-2.5">
-              <p className="font-mono text-xs text-foreground/80 break-all leading-relaxed">{error.message}</p>
+              <p className="font-mono text-xs text-foreground/80 break-all leading-relaxed">{group.message}</p>
             </div>
           </div>
 
@@ -237,11 +306,7 @@ function FilterModal({ error, onConfirm, onCancel, saving }: FilterModalProps) {
         </div>
 
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border">
-          <button
-            onClick={onCancel}
-            disabled={saving}
-            className="rounded-md border border-input px-4 py-2 text-sm hover:bg-accent transition-colors disabled:opacity-50"
-          >
+          <button onClick={onCancel} disabled={saving} className="rounded-md border border-input px-4 py-2 text-sm hover:bg-accent transition-colors disabled:opacity-50">
             Cancel
           </button>
           <button
@@ -300,15 +365,9 @@ function FiltersPanel({ filters, onDelete }: FiltersPanelProps) {
               <div className="min-w-0 flex-1 space-y-0.5">
                 <p className="text-xs font-mono text-foreground/80 truncate">{f.message}</p>
                 <div className="flex items-center gap-2 flex-wrap">
-                  {f.event_type && (
-                    <span className="text-[11px] bg-muted px-1.5 py-0.5 rounded font-mono text-muted-foreground">{f.event_type}</span>
-                  )}
-                  {f.note && (
-                    <span className="text-[11px] text-muted-foreground italic">{f.note}</span>
-                  )}
-                  {!f.event_type && !f.note && (
-                    <span className="text-[11px] text-muted-foreground">all event types</span>
-                  )}
+                  {f.event_type && <span className="text-[11px] bg-muted px-1.5 py-0.5 rounded font-mono text-muted-foreground">{f.event_type}</span>}
+                  {f.note       && <span className="text-[11px] text-muted-foreground italic">{f.note}</span>}
+                  {!f.event_type && !f.note && <span className="text-[11px] text-muted-foreground">all event types</span>}
                 </div>
               </div>
               <button
@@ -382,19 +441,18 @@ interface ErrorTableProps {
 
 export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTableProps) {
   const [activeProjectId, setActiveProjectId] = useState(initialProjectId)
-  const [errors, setErrors]     = useState<ErrorRecord[]>([])
-  const [total, setTotal]       = useState(0)
-  const [page, setPage]         = useState(1)
-  const [loading, setLoading]   = useState(true)
-  const [resolveTarget, setResolveTarget] = useState<ErrorRecord | null>(null)
+  const [groups, setGroups]       = useState<GroupedError[]>([])
+  const [total, setTotal]         = useState(0)
+  const [page, setPage]           = useState(1)
+  const [loading, setLoading]     = useState(true)
+  const [resolveTarget, setResolveTarget] = useState<GroupedError | null>(null)
   const [resolving, setResolving]         = useState(false)
-  const [filterTarget, setFilterTarget]   = useState<ErrorRecord | null>(null)
+  const [filterTarget, setFilterTarget]   = useState<GroupedError | null>(null)
   const [savingFilter, setSavingFilter]   = useState(false)
   const [filters, setFilters]             = useState<IngestFilter[]>([])
   const [trendsOpen, setTrendsOpen]       = useState(false)
   const [trendsCache, setTrendsCache]     = useState<string | null>(null)
 
-  // Filter state
   const [search, setSearch]         = useState('')
   const [eventType, setEventType]   = useState<EventType | ''>('')
   const [timeRange, setTimeRange]   = useState('')
@@ -417,7 +475,12 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
   const fetchErrors = useCallback(async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams({ project_id: activeProjectId, page: String(page), limit: String(limit) })
+      const params = new URLSearchParams({
+        project_id: activeProjectId,
+        grouped: 'true',
+        page: String(page),
+        limit: String(limit),
+      })
       if (search)     params.set('search', search)
       if (eventType)  params.set('event_type', eventType)
       if (browser)    params.set('browser', browser)
@@ -425,12 +488,12 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
       if (connection) params.set('connection', connection)
       if (page_)      params.set('url', page_)
       const from = timeRangeToFrom(timeRange)
-      if (from) params.set('from', from)
+      if (from)       params.set('from', from)
 
       const res = await fetch(`/api/errors?${params}`)
       if (!res.ok) throw new Error('Failed to fetch')
       const data = await res.json()
-      setErrors(data.data)
+      setGroups(data.data)
       setTotal(data.total)
     } catch (err) {
       console.error(err)
@@ -464,9 +527,9 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           project_id: activeProjectId,
-          message: filterTarget.message,
+          message:    filterTarget.message,
           event_type: filterTarget.event_type ?? null,
-          note: note || null,
+          note:       note || null,
         }),
       })
       if (!res.ok && res.status !== 409) throw new Error('Failed to create filter')
@@ -497,7 +560,7 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           project_id: activeProjectId,
-          message: resolveTarget.message,
+          message:    resolveTarget.message,
           event_type: resolveTarget.event_type,
         }),
       })
@@ -524,16 +587,10 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
     <div className="space-y-3">
 
       {/* ── Ingest filters panel ──────────────────────────────────────────── */}
-      <FiltersPanel
-        projectId={activeProjectId}
-        filters={filters}
-        onDelete={deleteFilter}
-      />
+      <FiltersPanel projectId={activeProjectId} filters={filters} onDelete={deleteFilter} />
 
       {/* ── Toolbar ───────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-2">
-
-        {/* Event type pills */}
         <div className="flex gap-0.5 rounded-lg border border-border bg-muted/40 p-0.5">
           {EVENT_TYPES.map(({ value, label }) => (
             <button
@@ -552,52 +609,14 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
 
         <div className="w-px h-5 bg-border" />
 
-        {/* Time range */}
-        <FilterDropdown
-          label="Time"
-          icon={Clock}
-          value={timeRange}
-          onChange={(v) => { setTimeRange(v); setPage(1) }}
-          placeholder="Any time"
-          entries={TIME_RANGES.slice(1)}
-        />
-
-        {/* Browser */}
-        <FilterDropdown
-          label="Browser"
-          icon={Monitor}
-          value={browser}
-          onChange={(v) => { setBrowser(v); setPage(1) }}
-          placeholder="Browser"
-          options={BROWSERS}
-        />
-
-        {/* OS */}
-        <FilterDropdown
-          label="OS"
-          icon={Monitor}
-          value={os}
-          onChange={(v) => { setOs(v); setPage(1) }}
-          placeholder="OS"
-          options={OPERATING_SYSTEMS}
-        />
-
-        {/* Connection */}
-        <FilterDropdown
-          label="Connection"
-          icon={Wifi}
-          value={connection}
-          onChange={(v) => { setConnection(v); setPage(1) }}
-          placeholder="Connection"
-          options={CONNECTIONS}
-        />
+        <FilterDropdown label="Time"       icon={Clock}    value={timeRange}   onChange={(v) => { setTimeRange(v);   setPage(1) }} placeholder="Any time"   entries={TIME_RANGES.slice(1)} />
+        <FilterDropdown label="Browser"    icon={Monitor}  value={browser}     onChange={(v) => { setBrowser(v);     setPage(1) }} placeholder="Browser"    options={BROWSERS} />
+        <FilterDropdown label="OS"         icon={Monitor}  value={os}          onChange={(v) => { setOs(v);          setPage(1) }} placeholder="OS"         options={OPERATING_SYSTEMS} />
+        <FilterDropdown label="Connection" icon={Wifi}     value={connection}  onChange={(v) => { setConnection(v);  setPage(1) }} placeholder="Connection" options={CONNECTIONS} />
 
         <div className="ml-auto flex items-center gap-2">
           {hasAnyFilter && (
-            <button
-              onClick={clearAllFilters}
-              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors"
-            >
+            <button onClick={clearAllFilters} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors">
               <X className="h-3 w-3" />
               Clear
             </button>
@@ -610,11 +629,7 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
             <Sparkles className="h-3.5 w-3.5" />
             Analyze
           </button>
-          <button
-            onClick={fetchErrors}
-            className="rounded-md border border-input p-1.5 hover:bg-accent transition-colors"
-            title="Refresh"
-          >
+          <button onClick={fetchErrors} className="rounded-md border border-input p-1.5 hover:bg-accent transition-colors" title="Refresh">
             <RefreshCw className={`h-3.5 w-3.5 text-muted-foreground ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
@@ -633,11 +648,7 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
             className="h-8 w-full pl-8 pr-3 rounded-md border border-input bg-background text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
           {searchInput && (
-            <button
-              type="button"
-              onClick={() => { setSearchInput(''); setSearch(''); setPage(1) }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-            >
+            <button type="button" onClick={() => { setSearchInput(''); setSearch(''); setPage(1) }} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
               <X className="h-3.5 w-3.5" />
             </button>
           )}
@@ -653,20 +664,13 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
               ${page_ ? 'border-primary/50 bg-primary/5' : 'border-input bg-background'}`}
           />
           {page_ && (
-            <button
-              type="button"
-              onClick={() => { setPage_(''); setPage(1) }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-            >
+            <button type="button" onClick={() => { setPage_(''); setPage(1) }} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
               <X className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
         {searchInput !== search && (
-          <button
-            type="submit"
-            className="h-8 rounded-md border border-input px-3 text-xs hover:bg-accent transition-colors whitespace-nowrap"
-          >
+          <button type="submit" className="h-8 rounded-md border border-input px-3 text-xs hover:bg-accent transition-colors whitespace-nowrap">
             Search
           </button>
         )}
@@ -677,21 +681,15 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
         <div className="flex flex-wrap gap-1.5">
           {[
             search     && { label: `"${truncate(search, 30)}"`,   clear: () => { setSearch(''); setSearchInput(''); setPage(1) } },
-            timeRange  && { label: TIME_RANGES.find(t => t.label === timeRange || t.value === timeRange)?.label ?? timeRange, clear: () => { setTimeRange(''); setPage(1) } },
-            browser    && { label: browser,                        clear: () => { setBrowser('');    setPage(1) } },
-            os         && { label: os,                             clear: () => { setOs('');         setPage(1) } },
-            connection && { label: connection,                     clear: () => { setConnection(''); setPage(1) } },
-            page_      && { label: `path: ${page_}`,              clear: () => { setPage_('');      setPage(1) } },
+            timeRange  && { label: TIME_RANGES.find(t => t.value === timeRange)?.label ?? timeRange, clear: () => { setTimeRange(''); setPage(1) } },
+            browser    && { label: browser,          clear: () => { setBrowser('');    setPage(1) } },
+            os         && { label: os,               clear: () => { setOs('');         setPage(1) } },
+            connection && { label: connection,       clear: () => { setConnection(''); setPage(1) } },
+            page_      && { label: `path: ${page_}`, clear: () => { setPage_('');      setPage(1) } },
           ].filter(Boolean).map((chip: any) => (
-            <span
-              key={chip.label}
-              className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/60 px-2.5 py-1 text-[11px] text-foreground/70"
-            >
+            <span key={chip.label} className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/60 px-2.5 py-1 text-[11px] text-foreground/70">
               {chip.label}
-              <button
-                onClick={chip.clear}
-                className="ml-0.5 rounded-full hover:text-destructive transition-colors"
-              >
+              <button onClick={chip.clear} className="ml-0.5 rounded-full hover:text-destructive transition-colors">
                 <X className="h-2.5 w-2.5" />
               </button>
             </span>
@@ -706,52 +704,72 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
             <RefreshCw className="h-4 w-4 animate-spin mx-auto mb-2 text-muted-foreground/50" />
             Loading…
           </div>
-        ) : errors.length === 0 ? (
-          <div className="px-4 py-14 text-center">
-            <AlertCircle className="h-7 w-7 text-muted-foreground/30 mx-auto mb-2" />
-            <p className="text-muted-foreground text-sm mb-1">
-              {hasAnyFilter ? 'No events match your filters' : 'No events yet'}
-            </p>
-            {hasAnyFilter ? (
-              <button onClick={clearAllFilters} className="text-xs text-primary hover:underline">
-                Clear all filters
-              </button>
-            ) : (
-              <p className="text-xs text-muted-foreground/50">Install the SDK and events will appear here</p>
-            )}
-          </div>
-        ) : (
-          errors.map((error) => (
-            <div key={error.id} className="group flex items-start gap-2.5 px-4 py-2.5 hover:bg-muted/30 transition-colors">
-              <EventTypeBadge type={error.event_type ?? 'error'} />
-              <Link href={`/dashboard/errors/${error.id}`} className="min-w-0 flex-1 hover:text-primary transition-colors" onClick={() => { setTimeout(() => { throw new Error('Test error — remove me') }, 0) }}>
-                <p className="text-xs font-mono font-medium text-foreground/80 truncate">
-                  {error.message}
-                </p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">
-                  {[
-                    error.url && (() => { try { return new URL(error.url!).pathname } catch { return error.url } })(),
-                    error.browser,
-                    formatRelativeTime(error.created_at),
-                  ].filter(Boolean).join(' · ')}
-                </p>
-              </Link>
-              <button
-                onClick={(e) => { e.preventDefault(); setFilterTarget(error) }}
-                title="Add ingest filter — drop future events with this fingerprint"
-                className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-orange-500/10 hover:text-orange-500 mt-0.5"
-              >
-                <Ban className="h-3.5 w-3.5" />
-              </button>
-              <button
-                onClick={(e) => { e.preventDefault(); setResolveTarget(error) }}
-                title="Resolve — delete all errors with this message"
-                className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive mt-0.5"
-              >
-                <CheckCircle className="h-3.5 w-3.5" />
-              </button>
+        ) : groups.length === 0 ? (
+          hasAnyFilter ? (
+            <div className="px-4 py-14 text-center">
+              <AlertCircle className="h-7 w-7 text-muted-foreground/30 mx-auto mb-2" />
+              <p className="text-muted-foreground text-sm mb-1">No events match your filters</p>
+              <button onClick={clearAllFilters} className="text-xs text-primary hover:underline">Clear all filters</button>
             </div>
-          ))
+          ) : (
+            <OnboardingEmptyState />
+          )
+        ) : (
+          groups.map((group) => {
+            const path = group.sample_url
+              ? (() => { try { return new URL(group.sample_url!).pathname } catch { return group.sample_url } })()
+              : null
+
+            return (
+              <div key={`${group.message_fingerprint ?? group.message}:${group.event_type}`} className="group flex items-start gap-2.5 px-4 py-2.5 hover:bg-muted/30 transition-colors">
+                <EventTypeBadge type={group.event_type as EventType ?? 'error'} />
+
+                <Link href={`/dashboard/errors/${group.sample_id}`} className="min-w-0 flex-1 hover:text-primary transition-colors">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-xs font-mono font-medium text-foreground/80 truncate">
+                      {group.message}
+                    </p>
+                    {/* Occurrence count badge */}
+                    {group.count > 1 && (
+                      <span className="shrink-0 inline-flex items-center rounded-full bg-muted border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                        {group.count.toLocaleString()}×
+                      </span>
+                    )}
+                    {/* Regression badge */}
+                    {group.is_regression && (
+                      <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-yellow-500/10 border border-yellow-500/20 px-1.5 py-0.5 text-[10px] font-medium text-yellow-600 dark:text-yellow-400">
+                        <RotateCcw className="h-2.5 w-2.5" />
+                        Regression
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    {[
+                      path,
+                      group.sample_browser,
+                      `last seen ${formatRelativeTime(group.last_seen)}`,
+                      group.count > 1 ? `first seen ${formatRelativeTime(group.first_seen)}` : null,
+                    ].filter(Boolean).join(' · ')}
+                  </p>
+                </Link>
+
+                <button
+                  onClick={(e) => { e.preventDefault(); setFilterTarget(group) }}
+                  title="Add ingest filter — drop future events with this fingerprint"
+                  className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-orange-500/10 hover:text-orange-500 mt-0.5"
+                >
+                  <Ban className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={(e) => { e.preventDefault(); setResolveTarget(group) }}
+                  title="Resolve — delete all errors with this message"
+                  className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive mt-0.5"
+                >
+                  <CheckCircle className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )
+          })
         )}
       </div>
 
@@ -759,23 +777,15 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
       {(totalPages > 1 || total > 0) && (
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground">
-            {total.toLocaleString()} event{total !== 1 ? 's' : ''}
+            {total.toLocaleString()} issue{total !== 1 ? 's' : ''}
             {totalPages > 1 && ` · page ${page} of ${totalPages}`}
           </span>
           {totalPages > 1 && (
             <div className="flex gap-1.5">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="rounded-md border border-input px-3 py-1.5 text-xs disabled:opacity-40 hover:bg-accent transition-colors"
-              >
+              <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="rounded-md border border-input px-3 py-1.5 text-xs disabled:opacity-40 hover:bg-accent transition-colors">
                 ← Previous
               </button>
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="rounded-md border border-input px-3 py-1.5 text-xs disabled:opacity-40 hover:bg-accent transition-colors"
-              >
+              <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="rounded-md border border-input px-3 py-1.5 text-xs disabled:opacity-40 hover:bg-accent transition-colors">
                 Next →
               </button>
             </div>
@@ -786,7 +796,7 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
       {/* ── Resolve modal ─────────────────────────────────────────────────── */}
       {resolveTarget && (
         <ResolveModal
-          error={resolveTarget}
+          group={resolveTarget}
           projectId={activeProjectId}
           onConfirm={confirmResolve}
           onCancel={() => { if (!resolving) setResolveTarget(null) }}
@@ -807,7 +817,7 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
       {/* ── Filter modal ──────────────────────────────────────────────────── */}
       {filterTarget && (
         <FilterModal
-          error={filterTarget}
+          group={filterTarget}
           projectId={activeProjectId}
           onConfirm={confirmFilter}
           onCancel={() => { if (!savingFilter) setFilterTarget(null) }}

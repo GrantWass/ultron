@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createServerClient } from '@/lib/supabase/server'
+import { createServerClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { fingerprint } from '@/lib/fingerprint'
 
 
@@ -100,6 +100,14 @@ export async function DELETE(request: Request) {
 
   const error = e1 ?? e2
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Record the resolution so re-appearances can be flagged as regressions.
+  const service = createServiceRoleClient()
+  await service.from('resolved_fingerprints')
+    .upsert(
+      { project_id, fingerprint: fp, resolved_at: new Date().toISOString() },
+      { onConflict: 'project_id,fingerprint' }
+    )
 
   return NextResponse.json({ deleted: (c1 ?? 0) + (c2 ?? 0) })
 }
