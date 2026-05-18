@@ -219,7 +219,7 @@ export async function POST(request: Request) {
   const prompt = buildPrompt(error, files)
 
   const result = streamText({
-    model: openai('gpt-5-mini'),
+    model: openai('gpt-4o-mini'),
     messages: [{ role: 'user', content: prompt }],
     maxTokens: 16000,
     onFinish: async ({ text }) => {
