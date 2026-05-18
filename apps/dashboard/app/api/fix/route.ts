@@ -4,6 +4,7 @@ import { createServerClient, createServiceRoleClient } from '@/lib/supabase/serv
 import { parseStackTrace, extractSearchKeywords } from '@/lib/stack-parser'
 import { fetchGitHubFiles, searchAndFetchGitHubFiles } from '@/lib/github'
 import { LIMITS, isWeekExpired, type Plan } from '@/lib/plans'
+import { fixRatelimit } from '@/lib/redis'
 import type { ErrorRecord, ErrorWithProjectAndGitHub, RelevantFile } from '@ultron/types'
 
 export const runtime = 'nodejs'
@@ -55,6 +56,14 @@ export async function POST(request: Request) {
   if (!user) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  const { success: rateLimitOk } = await fixRatelimit.limit(user.id)
+  if (!rateLimitOk) {
+    return new Response(JSON.stringify({ error: 'Too many requests' }), {
+      status: 429,
       headers: { 'Content-Type': 'application/json' },
     })
   }

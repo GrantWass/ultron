@@ -3,6 +3,7 @@ import { randomBytes } from 'crypto'
 import { createServerClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { sendInviteEmail } from '@/lib/email'
 import { LIMITS, type Plan } from '@/lib/plans'
+import { apiRatelimit } from '@/lib/redis'
 
 
 // GET /api/projects/[id]/members — list members (owner only)
@@ -38,6 +39,9 @@ export async function POST(
   const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { success } = await apiRatelimit.limit(user.id)
+  if (!success) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
   // Verify ownership
   const { data: project } = await supabase

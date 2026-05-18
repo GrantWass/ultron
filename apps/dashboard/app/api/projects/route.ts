@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServerClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { LIMITS, type Plan } from '@/lib/plans'
+import { apiRatelimit } from '@/lib/redis'
 
 
 const CreateProjectSchema = z.object({
@@ -47,6 +48,9 @@ export async function POST(request: Request) {
   const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { success } = await apiRatelimit.limit(user.id)
+  if (!success) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
   const body = await request.json()
   const parsed = CreateProjectSchema.safeParse(body)

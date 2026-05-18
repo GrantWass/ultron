@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server'
 import { createServerClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { stripe } from '@/lib/stripe'
+import { billingRatelimit } from '@/lib/redis'
 
 export async function POST(request: Request) {
   const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { success } = await billingRatelimit.limit(user.id)
+  if (!success) return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
 
   const service = createServiceRoleClient()
   const { data: profile } = await service
