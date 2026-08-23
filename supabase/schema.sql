@@ -6,11 +6,37 @@
 -- ============================================================
 
 -- Profiles (extends auth.users — auto-created via trigger)
+-- Billing/usage columns are written ONLY by server code via the service-role
+-- client; end users have SELECT-only access (see RLS section below).
 create table if not exists profiles (
   id uuid references auth.users(id) on delete cascade primary key,
   plan text not null default 'free',
+  stripe_customer_id text,
+  stripe_subscription_id text,
+  monthly_event_count int not null default 0,
+  billing_cycle_start date not null default current_date,
+  weekly_ai_count int not null default 0,
+  ai_count_reset_at timestamptz not null default now(),
   created_at timestamptz not null default now()
 );
+
+-- Migration: run these if the table already exists without the billing columns
+alter table profiles add column if not exists stripe_customer_id text;
+alter table profiles add column if not exists stripe_subscription_id text;
+alter table profiles add column if not exists monthly_event_count int not null default 0;
+alter table profiles add column if not exists billing_cycle_start date not null default current_date;
+alter table profiles add column if not exists weekly_ai_count int not null default 0;
+alter table profiles add column if not exists ai_count_reset_at timestamptz not null default now();
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'profiles_plan_check' and conrelid = 'public.profiles'::regclass
+  ) then
+    alter table public.profiles add constraint profiles_plan_check check (plan in ('free', 'pro'));
+  end if;
+end $$;
 
 -- Projects (one user can have many projects)
 create table if not exists projects (
@@ -21,12 +47,16 @@ create table if not exists projects (
   created_at timestamptz not null default now()
 );
 
+-- api_key is looked up with .single() on every ingested event — enforce uniqueness
+create unique index if not exists projects_api_key_unique on projects(api_key);
+
 -- Errors ingested from the npm SDK
 create table if not exists errors (
   id uuid primary key default gen_random_uuid(),
   project_id uuid references projects(id) on delete cascade not null,
   event_type text not null default 'error', -- 'error' | 'network' | 'vital' | 'resource_error'
   message text not null,
+  message_fingerprint text,  -- normalized message used for grouping + ingest filters
   stack_trace text,
   url text,
   browser text,
@@ -92,8 +122,13 @@ alter table errors add column if not exists release_version text;
 create index if not exists errors_project_id_created_at
   on errors(project_id, created_at desc);
 
+-- Supports resolve/grouping lookups: (project_id, event_type, message_fingerprint)
 create index if not exists errors_project_type_fingerprint
-  on errors(project_id, message_fingerprint) where message_fingerprint is not null;
+  on errors(project_id, event_type, message_fingerprint);
+
+-- Supports retention cleanup scans across all projects
+create index if not exists errors_created_at
+  on errors(created_at);
 
 -- ------------------------------------------------------------
 -- RELEASES
@@ -190,10 +225,14 @@ alter table github_connections enable row level security;
 alter table fix_suggestions enable row level security;
 alter table ingest_filters enable row level security;
 
--- profiles: each user manages their own profile
-create policy "Users can manage own profile"
-  on profiles for all
+-- profiles: read-only for end users. All writes (plan, usage counters) happen
+-- server-side via the service-role client, which bypasses RLS. A broad
+-- FOR ALL / UPDATE policy here would let any user grant themselves plan='pro'.
+drop policy if exists "Users can manage own profile" on profiles;
+create policy "Users can view own profile"
+  on profiles for select
   using (auth.uid() = id);
+revoke insert, update, delete on profiles from authenticated;
 
 -- projects: owner only
 create policy "Users can manage own projects"
@@ -273,6 +312,27 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row
   execute procedure handle_new_user();
+
+-- Atomic increment of the monthly event counter, called by the ingest route
+-- (service role). Hardened: pinned search_path, rejects non-positive amounts,
+-- and execution is revoked from anon/authenticated roles.
+create or replace function increment_event_count(user_id uuid, amount int)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if amount is null or amount <= 0 then
+    return;
+  end if;
+  update profiles
+  set monthly_event_count = monthly_event_count + amount
+  where id = user_id;
+end;
+$$;
+
+revoke execute on function increment_event_count(uuid, int) from anon, authenticated;
 
 -- ============================================================
 -- PROJECT MEMBERS (collaborators / invites)
