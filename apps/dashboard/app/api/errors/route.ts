@@ -46,12 +46,14 @@ export async function GET(request: Request) {
   const browser    = searchParams.get('browser')
   const os         = searchParams.get('os')
   const connection = searchParams.get('connection')
+  const release    = searchParams.get('release')
 
   if (from)       query = query.gte('created_at', from)
   if (to)         query = query.lte('created_at', to)
   if (search)     query = query.ilike('message', `%${search}%`)
   if (url)        query = query.ilike('url', `%${url}%`)
   if (eventType)  query = query.eq('event_type', eventType)
+  if (release)    query = query.eq('release_version', release)
   // Never show 'good' vital readings in the feed — they belong in the analytics tab
   query = query.or('event_type.neq.vital,metadata->>rating.is.null,metadata->>rating.neq.good')
   if (browser)    query = query.ilike('browser', `%${browser}%`)

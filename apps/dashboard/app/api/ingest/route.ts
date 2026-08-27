@@ -136,11 +136,12 @@ export async function POST(request: Request) {
   }
   // ──────────────────────────────────────────────────────────────────────────
 
-  // Fetch active ingest filters for this project
-  const { data: activeFilters } = await supabase
-    .from('ingest_filters')
-    .select('fingerprint, event_type')
-    .eq('project_id', project.id)
+  // Fetch active ingest filters + nearest preceding release (by deployed_at)
+  const [{ data: activeFilters }, { data: latestRelease }] = await Promise.all([
+    supabase.from('ingest_filters').select('fingerprint, event_type').eq('project_id', project.id),
+    supabase.from('releases').select('version').eq('project_id', project.id).order('deployed_at', { ascending: false }).limit(1).maybeSingle(),
+  ])
+  const releaseVersion = latestRelease?.version ?? null
 
   const filteredFingerprints = new Set(
     (activeFilters ?? [])
@@ -167,6 +168,7 @@ export async function POST(request: Request) {
     session_id: e.session_id,
     session_recording_id: e.session_recording_id ?? null,
     metadata: e.metadata,
+    release_version: releaseVersion,
   }))
 
   const records = allRecords.filter((r) => {
