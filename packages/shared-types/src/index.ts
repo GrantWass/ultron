@@ -28,6 +28,16 @@ export interface ErrorRecord {
   session_id: string | null
   metadata: Record<string, unknown>
   created_at: string
+  release_version?: string | null
+  message_fingerprint?: string | null
+}
+
+export interface ReleaseRecord {
+  id: string
+  project_id: string
+  version: string
+  deployed_at: string
+  created_at: string
 }
 
 export interface ProjectMember {

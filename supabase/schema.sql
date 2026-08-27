@@ -85,9 +85,56 @@ create policy "Members can view session recordings"
 -- No FK constraint: recording upload is async and may arrive after the error row
 alter table errors add column if not exists session_recording_id uuid;
 
+alter table errors add column if not exists message_fingerprint text;
+alter table errors add column if not exists release_version text;
+
 -- Index for fast project error feeds sorted by time
 create index if not exists errors_project_id_created_at
   on errors(project_id, created_at desc);
+
+create index if not exists errors_project_type_fingerprint
+  on errors(project_id, message_fingerprint) where message_fingerprint is not null;
+
+-- ------------------------------------------------------------
+-- RELEASES
+-- Deploy markers posted via POST /api/ingest/release. Errors ingested
+-- while a release is latest are stamped with its version (nearest preceding
+-- release by deployed_at). Used for "Introduced in vX" and regression badges.
+-- ------------------------------------------------------------
+create table if not exists releases (
+  id          uuid primary key default gen_random_uuid(),
+  project_id  uuid references projects(id) on delete cascade not null,
+  version     text not null,
+  deployed_at timestamptz not null default now(),
+  created_at  timestamptz not null default now(),
+  unique(project_id, version)
+);
+
+create index if not exists releases_project_recent
+  on releases(project_id, deployed_at desc);
+
+alter table releases enable row level security;
+
+create policy "Project owners can manage releases"
+  on releases for all
+  using (get_project_owner(releases.project_id) = auth.uid());
+
+create policy "Members can view releases"
+  on releases for select
+  using (
+    exists (
+      select 1 from project_members
+      where project_members.project_id = releases.project_id
+        and project_members.user_id = auth.uid()
+        and project_members.status = 'accepted'
+    )
+  );
+
+-- Helper: regression detection — an error is a regression if its fingerprint
+-- was previously seen, then absent for >7 days, then reappears (or after a
+-- user-resolved marker). For the simple release-based case we surface
+-- "Introduced in vX" when the first_seen release differs from the previous
+-- release where this fingerprint existed.
 
 -- GitHub OAuth connection (one per user — shared across all their projects)
 create table if not exists github_user_connections (

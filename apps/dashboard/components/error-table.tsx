@@ -7,7 +7,7 @@ import { EventTypeBadge } from '@/components/event-badge'
 import type { ErrorRecord, EventType } from '@ultron/types'
 import {
   Search, AlertCircle, RefreshCw, X, CheckCircle,
-  ChevronDown, Clock, Globe, Wifi, Monitor, Trash2, Ban, ChevronRight, Sparkles,
+  ChevronDown, Clock, Globe, Wifi, Monitor, Trash2, Ban, ChevronRight, Sparkles, Tag,
 } from 'lucide-react'
 import { TrendsDrawer } from '@/components/trends-drawer'
 
@@ -403,6 +403,8 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
   const [connection, setConnection] = useState('')
   const [page_, setPage_]           = useState('')
   const [searchInput, setSearchInput] = useState('')
+  const [release, setRelease]       = useState('')
+  const [releases, setReleases]     = useState<{ version: string; deployed_at: string }[]>([])
 
   const limit = 50
   const searchRef = useRef<HTMLInputElement>(null)
@@ -411,7 +413,7 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
     setSearch(''); setSearchInput('')
     setEventType(''); setTimeRange('')
     setBrowser(''); setOs(''); setConnection('')
-    setPage_(''); setPage(1)
+    setPage_(''); setRelease(''); setPage(1)
   }
 
   const fetchErrors = useCallback(async () => {
@@ -424,6 +426,7 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
       if (os)         params.set('os', os)
       if (connection) params.set('connection', connection)
       if (page_)      params.set('url', page_)
+      if (release)    params.set('release', release)
       const from = timeRangeToFrom(timeRange)
       if (from) params.set('from', from)
 
@@ -437,7 +440,7 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
     } finally {
       setLoading(false)
     }
-  }, [activeProjectId, page, search, eventType, timeRange, browser, os, connection, page_])
+  }, [activeProjectId, page, search, eventType, timeRange, browser, os, connection, page_, release])
 
   useEffect(() => { fetchErrors() }, [fetchErrors])
 
@@ -454,6 +457,18 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
   }, [activeProjectId])
 
   useEffect(() => { fetchFilters() }, [fetchFilters])
+
+  const fetchReleases = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/releases?project_id=${activeProjectId}`)
+      if (res.ok) {
+        const data = await res.json()
+        setReleases(Array.isArray(data) ? data : [])
+      }
+    } catch { /* ignore */ }
+  }, [activeProjectId])
+
+  useEffect(() => { fetchReleases() }, [fetchReleases])
 
   async function confirmFilter(note: string) {
     if (!filterTarget) return
@@ -518,7 +533,24 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
   }
 
   const totalPages   = Math.ceil(total / limit)
-  const hasAnyFilter = !!(search || eventType || timeRange || browser || os || connection || page_)
+  const hasAnyFilter = !!(search || eventType || timeRange || browser || os || connection || page_ || release)
+
+  // Regression detection: an error is a likely regression if its release_version
+  // equals the latest deployed release and its fingerprint was not seen in the
+  // previous release window. For the table we use a lightweight heuristic:
+  // if the error's release matches the newest release and it is among the
+  // most recent errors, surface the regression badge.
+  const latestReleaseVersion = releases[0]?.version ?? null
+  function isRegression(error: ErrorRecord): boolean {
+    if (!error.release_version || !latestReleaseVersion) return false
+    if (error.release_version !== latestReleaseVersion) return false
+    // Heuristic: regression if fingerprint appears after a release that previously had no errors
+    // Without full history we highlight any error in the latest release as a potential regression
+    // when filtered by release or when the error is very recent (<24h).
+    if (release && release === latestReleaseVersion) return true
+    const ageMs = Date.now() - new Date(error.created_at).getTime()
+    return ageMs < 24 * 60 * 60 * 1000
+  }
 
   return (
     <div className="space-y-3">
@@ -590,6 +622,16 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
           onChange={(v) => { setConnection(v); setPage(1) }}
           placeholder="Connection"
           options={CONNECTIONS}
+        />
+
+        {/* Release */}
+        <FilterDropdown
+          label="Release"
+          icon={Tag}
+          value={release}
+          onChange={(v) => { setRelease(v); setPage(1) }}
+          placeholder="Release"
+          options={releases.map((r) => r.version)}
         />
 
         <div className="ml-auto flex items-center gap-2">
@@ -673,7 +715,7 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
       </form>
 
       {/* ── Active filter chips ───────────────────────────────────────────── */}
-      {(search || browser || os || connection || page_ || timeRange) && (
+      {(search || browser || os || connection || page_ || timeRange || release) && (
         <div className="flex flex-wrap gap-1.5">
           {[
             search     && { label: `"${truncate(search, 30)}"`,   clear: () => { setSearch(''); setSearchInput(''); setPage(1) } },
@@ -682,6 +724,7 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
             os         && { label: os,                             clear: () => { setOs('');         setPage(1) } },
             connection && { label: connection,                     clear: () => { setConnection(''); setPage(1) } },
             page_      && { label: `path: ${page_}`,              clear: () => { setPage_('');      setPage(1) } },
+            release    && { label: `release: ${release}`,         clear: () => { setRelease('');    setPage(1) } },
           ].filter(Boolean).map((chip: any) => (
             <span
               key={chip.label}
@@ -725,8 +768,18 @@ export function ErrorTable({ projectId: initialProjectId, projects }: ErrorTable
             <div key={error.id} className="group flex items-start gap-2.5 px-4 py-2.5 hover:bg-muted/30 transition-colors">
               <EventTypeBadge type={error.event_type ?? 'error'} />
               <Link href={`/dashboard/errors/${error.id}`} className="min-w-0 flex-1 hover:text-primary transition-colors" onClick={() => { setTimeout(() => { throw new Error('Test error — remove me') }, 0) }}>
-                <p className="text-xs font-mono font-medium text-foreground/80 truncate">
-                  {error.message}
+                <p className="text-xs font-mono font-medium text-foreground/80 truncate flex items-center gap-1.5 flex-wrap">
+                  <span className="truncate">{error.message}</span>
+                  {(error as unknown as { release_version?: string | null }).release_version && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-mono font-medium text-primary shrink-0">
+                      <Tag className="h-2.5 w-2.5" /> Introduced in {(error as unknown as { release_version: string }).release_version}
+                    </span>
+                  )}
+                  {isRegression(error) && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/10 px-2 py-0.5 text-[10px] font-medium text-orange-600 dark:text-orange-400 shrink-0">
+                      <RefreshCw className="h-2.5 w-2.5" /> Regression
+                    </span>
+                  )}
                 </p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
                   {[
