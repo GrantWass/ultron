@@ -46,6 +46,11 @@ alter table public.profiles enable row level security;
 -- authenticated user grant themselves plan='pro'.
 drop policy if exists "Users can update own profile" on public.profiles;
 
+-- Also drop the legacy FOR ALL policy name used by the canonical schema.sql, so
+-- a database initialized from that schema and later updated by this migration
+-- does not retain a broad policy that lets users set their own plan='pro'.
+drop policy if exists "Users can manage own profile" on public.profiles;
+
 drop policy if exists "Users can view own profile" on public.profiles;
 create policy "Users can view own profile"
   on public.profiles for select
@@ -92,7 +97,8 @@ begin
 end;
 $$;
 
-revoke execute on function public.increment_event_count(uuid, int) from anon, authenticated;
+revoke execute on function public.increment_event_count(uuid, int) from public, anon, authenticated;
+grant execute on function public.increment_event_count(uuid, int) to service_role;
 
 -- 8. Back-fill a profile row for every existing user
 insert into public.profiles (id)

@@ -315,7 +315,7 @@ create trigger on_auth_user_created
 
 -- Atomic increment of the monthly event counter, called by the ingest route
 -- (service role). Hardened: pinned search_path, rejects non-positive amounts,
--- and execution is revoked from anon/authenticated roles.
+-- and execution is restricted to the service role.
 create or replace function increment_event_count(user_id uuid, amount int)
 returns void
 language plpgsql
@@ -332,7 +332,13 @@ begin
 end;
 $$;
 
-revoke execute on function increment_event_count(uuid, int) from anon, authenticated;
+-- Postgres grants EXECUTE on new functions to PUBLIC by default; revoking only
+-- from anon/authenticated still leaves the privilege inherited through PUBLIC.
+-- This SECURITY DEFINER function accepts an arbitrary user_id, so anyone with
+-- EXECUTE could inflate another account's usage (quota denial of service).
+-- Restrict to the service role, which is what the ingest route uses.
+revoke execute on function increment_event_count(uuid, int) from public, anon, authenticated;
+grant execute on function increment_event_count(uuid, int) to service_role;
 
 -- ============================================================
 -- PROJECT MEMBERS (collaborators / invites)
