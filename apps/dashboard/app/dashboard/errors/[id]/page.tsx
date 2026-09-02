@@ -9,7 +9,6 @@ import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { Tip } from '@/components/tip'
 import { SessionReplayPlayer } from '@/components/session-replay-player'
-import { TestError } from '@/components/test-error' // TEMPORARY
 
 // ── Metadata helpers ──────────────────────────────────────────────────────────
 
@@ -416,7 +415,6 @@ export default async function ErrorDetailPage({
 
   return (
     <div className="p-6 max-w-4xl space-y-6">
-      <TestError /> {/* TEMPORARY */}
       {/* Back link */}
       <Link
         href={`/dashboard/projects/${err.project_id}`}
